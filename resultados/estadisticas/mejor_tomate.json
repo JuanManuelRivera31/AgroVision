@@ -1,0 +1,70 @@
+{
+  "circularidad_min": 0.405,
+  "circularidad_min_verde": 0.6,
+  "solidez_min": 0.776,
+  "solidez_min_verde": 0.88,
+  "ajuste_elipse_min_verde": 0.747,
+  "area_min_frac": 0.006,
+  "kernel_cierre": 17,
+  "kernel_apertura_verde": 19,
+  "textura_max_verde": 18.0,
+  "ventana_picos_frac": 0.498,
+  "umbral_dist_watershed": 0.451,
+  "solidez_para_watershed": 0.99,
+  "colores": {
+    "rojo": [
+      [
+        [
+          0,
+          90,
+          60
+        ],
+        [
+          10,
+          255,
+          255
+        ]
+      ],
+      [
+        [
+          165,
+          90,
+          60
+        ],
+        [
+          179,
+          255,
+          255
+        ]
+      ]
+    ],
+    "naranja": [
+      [
+        [
+          11,
+          90,
+          70
+        ],
+        [
+          28,
+          255,
+          255
+        ]
+      ]
+    ],
+    "verde": [
+      [
+        [
+          29,
+          50,
+          50
+        ],
+        [
+          89,
+          255,
+          255
+        ]
+      ]
+    ]
+  }
+}

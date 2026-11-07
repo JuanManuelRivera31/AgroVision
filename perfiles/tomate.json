@@ -1,0 +1,41 @@
+{
+  "nombre": "tomate",
+  "descripcion": "Tomate redondo. Madurez por proporción de rojo frente a verde.",
+  "segmentacion": {
+    "colores": {
+      "rojo": [[[0, 90, 60], [10, 255, 255]], [[165, 90, 60], [179, 255, 255]]],
+      "naranja": [[[11, 90, 70], [24, 255, 255]]],
+      "verde": [[[27, 50, 50], [85, 255, 255]]]
+    },
+    "colores_follaje": ["verde"],
+    "circularidad_min": 0.45,
+    "circularidad_min_verde": 0.5,
+    "solidez_min": 0.86,
+    "solidez_min_verde": 0.8,
+    "ajuste_elipse_min_verde": 0.835,
+    "area_min_frac": 0.0015,
+    "area_min_rel": 0.5,
+    "kernel_cierre": 17,
+    "kernel_apertura_verde": 11,
+    "textura_max_verde": 18.0,
+    "ventana_picos_frac": 0.5,
+    "umbral_dist_watershed": 0.35,
+    "solidez_para_watershed": 0.9
+  },
+  "madurez": {
+    "colores": {
+      "rojo": [[[0, 0, 0], [10, 255, 255]], [[165, 0, 0], [179, 255, 255]]],
+      "naranja": [[[11, 0, 0], [30, 255, 255]]],
+      "verde": [[[31, 0, 0], [85, 255, 255]]]
+    },
+    "s_min_valido": 40,
+    "v_min_valido": 40,
+    "etapas": [
+      {"nombre": "Verde", "color_bgr": [60, 200, 60], "minimos": {"verde": 0.6}, "maximos": {"rojo": 0.1}},
+      {"nombre": "Pintón", "color_bgr": [0, 165, 255]},
+      {"nombre": "Maduro", "color_bgr": [40, 40, 230], "minimos": {"rojo": 0.6}}
+    ],
+    "por_defecto": "Pintón",
+    "ejes_grafico": ["verde", "rojo"]
+  }
+}

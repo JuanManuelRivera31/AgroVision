@@ -1,0 +1,40 @@
+{
+  "nombre": "banano",
+  "descripcion": "Banano alargado y curvo. Madurez por verde -> amarillo -> manchas café. Ajustado con data/imagenes/bananos_separados.jpeg (solo bananos con manchas).",
+  "segmentacion": {
+    "colores": {
+      "amarillo": [[[16, 80, 100], [32, 255, 255]]],
+      "cafe": [[[0, 60, 30], [20, 255, 150]]],
+      "verde": [[[33, 50, 50], [85, 255, 255]]]
+    },
+    "colores_follaje": ["verde"],
+    "aspecto_max": 6.0,
+    "circularidad_min": 0.2,
+    "solidez_min": 0.6,
+    "circularidad_min_verde": 0.25,
+    "solidez_min_verde": 0.65,
+    "ajuste_elipse_min_verde": 0.6,
+    "solidez_para_watershed": 0.55,
+    "ventana_picos_frac": 1.2,
+    "union_mas_circular": false,
+    "area_min_rel": 0.5,
+    "kernel_cierre": 15
+  },
+  "madurez": {
+    "colores": {
+      "cafe": [[[0, 0, 0], [30, 255, 110]]],
+      "amarillo": [[[16, 0, 111], [32, 255, 255]]],
+      "verde": [[[33, 0, 0], [85, 255, 255]]]
+    },
+    "s_min_valido": 40,
+    "v_min_valido": 40,
+    "etapas": [
+      {"nombre": "Verde", "color_bgr": [60, 200, 60], "minimos": {"verde": 0.7}},
+      {"nombre": "Pintón", "color_bgr": [0, 200, 200]},
+      {"nombre": "Maduro", "color_bgr": [0, 230, 255], "minimos": {"amarillo": 0.7}, "maximos": {"cafe": 0.15}},
+      {"nombre": "Sobremaduro", "color_bgr": [30, 70, 120], "minimos": {"cafe": 0.15}, "maximos": {"verde": 0.3}}
+    ],
+    "por_defecto": "Pintón",
+    "ejes_grafico": ["verde", "amarillo"]
+  }
+}

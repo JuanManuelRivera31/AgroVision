@@ -1,0 +1,14 @@
+# AgroVisión - dependencias (Python 3.10+)
+opencv-python>=4.9
+numpy>=1.26
+matplotlib>=3.8
+pandas>=2.1
+scikit-learn>=1.4
+Pillow>=10       # leer el EXIF (focal equivalente) de las fotos del celular
+# Entorno Jupyter (VS Code usa ipykernel)
+ipykernel>=6.29
+notebook>=7.0
+nbformat>=5.9
+nbclient>=0.10
+# Pruebas automáticas
+pytest>=8
