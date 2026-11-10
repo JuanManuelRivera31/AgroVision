@@ -65,6 +65,8 @@ AgroVision/
 3. Ejecute el Notebook desde el inicio (Etapas 1 a 4 y 8).
 4. Si la detección no es buena, ajuste el perfil (ver abajo). Las figuras de la Etapa 3 muestran cada máscara y el motivo de cada rechazo para guiar el ajuste.
 
+**Foto directa con el celular (DroidCam):** con la app abierta y `TOMAR_FOTO = True`, "Ejecutar todo" en el notebook abre la cámara; con ESPACIO se toma la foto y todo el notebook se evalúa sobre ella. El tamaño es aproximado: cada fruto sale con su diámetro en cm y como Pequeño/Mediano/Grande frente a los demás de la foto. Los cm suponen el celular a la misma altura que en la referencia (`ALTURA_CELULAR_CM` en `agrovision/config.py`, deducida de un tomate de 5.5 cm). La IP está en `ORIGEN_CELULAR` (`agrovision/config.py`). Versión rápida sin notebook: `.\.venv\Scripts\python herramientas/tomar_foto.py`.
+
 ### Perfiles de fruta
 Un perfil tiene dos secciones:
 
@@ -82,24 +84,19 @@ Cada fruta tiene su propio archivo de etiquetas (`data/etiquetas_madurez_<fruta>
 
 **Fotos de banano:** frutos sobre un fondo liso y claro (mantel, papel), sin que se toquen, con luz difusa. Los racimos (bananos pegados a lo largo) todavía no se separan bien: el watershed busca centros de frutos redondos.
 
+**El proyecto no usa tablero de calibración.** La focal sale de la ficha técnica (focal equivalente a 35 mm del celular, campo de visión de la webcam), la rotación entre vistas de la matriz esencial con puntos SIFT de la propia escena y la escala de la línea base medida con regla. Ver la Etapa 6.1 del notebook.
+
 ### Modo 2 — Estéreo con un celular (experimental)
-1. Imprima `data/calibracion/tablero_9x6_25mm_carta.pdf` a **tamaño real / 100 %** (la regla impresa debe medir 100 mm; se regenera con `revisar_tablero.py --pdf <ruta>`), péguelo sobre algo rígido y **mida un cuadro con regla** → `PATRON.tam_cuadro_mm`.
-2. 15-25 fotos del tablero con el celular → `data/calibracion/celular/` (misma resolución y orientación que usará en la escena, sin zoom). Revíselas antes de calibrar:
-
-   ```powershell
-   .\.venv\Scripts\python herramientas/revisar_tablero.py --cuadro <mm medidos> --vista resultados/cobertura.png
-   ```
-
-   Dice qué fotos sirven, el RMS, qué zonas del encuadre faltan y da un veredicto (APTA / USABLE / NO APTA).
-3. Par de la escena: foto izquierda, deslizar el celular horizontalmente sobre una regla fija (6-10 cm), foto derecha. Enfoque y exposición bloqueados. Escena estática.
-4. Opción A: deje el tablero visible en ambas fotos (`METODO_POSE_M2 = "tablero"`). Opción B: indique la distancia desplazada en `LINEA_BASE_M2_MM` (`"esencial"`).
+1. Indique la focal equivalente del celular en `F35_CELULAR` (o use una foto original con EXIF).
+2. Par de la escena: foto izquierda, deslizar el celular horizontalmente sobre una regla fija (6-10 cm), foto derecha. Enfoque y exposición bloqueados. Escena estática.
+3. Indique la distancia desplazada en `LINEA_BASE_M2_MM`.
 
 > No equivale a dos cámaras simultáneas: cualquier cambio de la escena entre fotos produce errores.
 
-### Modo 3 — Cámara del PC + celular
-1. Monte ambas cámaras rígidamente, paralelas, con campos de visión superpuestos; mida la separación (`LINEA_BASE_MEDIDA_M3_MM`).
-2. Conecte el celular como cámara. Recomendado: **DroidCam o Iriun por USB** (Android e iPhone; Windows lo ve como otra webcam, `ORIGEN_DER = 1` o `2`). Por Wi-Fi: *IP Webcam* (Android) → `ORIGEN_DER = "http://IP:8080/video"`, con más retraso (100-300 ms). Bloquee el enfoque del celular.
-3. Antes de calibrar, compruebe la conexión y el desfase con `herramientas/probar_camara.py`:
+### Modo 3 — Cámara del PC + celular por DroidCam
+1. Monte ambas cámaras rígidamente, paralelas, con campos de visión superpuestos; mida con regla la separación entre lentes (`LINEA_BASE_MEDIDA_M3_MM`).
+2. Conecte el celular con **DroidCam por USB** (Android e iPhone; con el cliente de Windows se ve como otra webcam, `ORIGEN_DER = 1` o `2`; sin cliente, `ORIGEN_DER = "http://IP:4747/video"`, con más retraso). Bloquee el enfoque y no use zoom.
+3. Compruebe la conexión y el desfase con `herramientas/probar_camara.py`:
 
    ```powershell
    .\.venv\Scripts\python herramientas/probar_camara.py --listar     # qué índices locales hay
@@ -108,32 +105,33 @@ Cada fruta tiene su propio archivo de etiquetas (`data/etiquetas_madurez_<fruta>
    ```
 
    Muestra la resolución, los FPS y el desfase, y al final dice si el par es apto (desfase ≤ 80 ms). Para medir el retraso real del celular, apúntelo a la ventana: la diferencia entre el reloj grande y el que se ve dentro de la imagen es el retraso.
-4. Configure `ORIGEN_IZQ`, `ORIGEN_DER`, `INTERCAMBIAR` y `TAM_M3`; active `CAPTURAR_CALIBRACION_M3 = True` y capture ~20 pares del tablero (`c` captura, `s` intercambia, `q` sale). Luego `CAPTURAR_ESCENA_M3 = True` para la escena.
-5. Ejecute la calibración (individual + `cv2.stereoCalibrate`) y la Etapa 7.
+4. Configure `ORIGEN_IZQ`, `ORIGEN_DER`, `INTERCAMBIAR` y `TAM_M3`; active `CAPTURAR_ESCENA_M3 = True` y capture pares de la escena (`c` captura, `s` intercambia, `q` sale). La escena debe tener textura para que SIFT encuentre correspondencias.
+5. Indique `FOV_PC_GRADOS` (ficha de la webcam; ~70° horizontal si no aparece) y ejecute la Etapa 6.4 y la Etapa 7.
 
-> Sin disparo sincronizado por hardware: se descartan capturas con desfase > 80 ms entre llegadas de fotogramas y se recomiendan escenas estáticas. Si se mueve una cámara, hay que recalibrar.
+> Sin disparo sincronizado por hardware: se descartan capturas con desfase > 80 ms entre llegadas de fotogramas y se recomiendan escenas estáticas. Si se mueve una cámara, vuelva a medir la línea base; la pose se recalcula de cada par.
 
 ## 4. Método (resumen para la sustentación)
 
-**Detección (no solo por color):** HSV + `cv2.inRange` (rojo en dos intervalos, naranja, verde) → la máscara verde se restringe a zonas lisas (`cv2.threshold` sobre la desviación estándar local) y se corta por bordes `cv2.Canny` → apertura/cierre (`cv2.morphologyEx`) → componentes con `cv2.findContours` (`RETR_CCOMP`) → watershed (`cv2.distanceTransform` + `cv2.watershed`) para frutos pegados → unión de la parte verde y roja de un pintón → validación con área (`cv2.contourArea`; además, un área mínima *relativa* a la mediana de los frutos de la misma foto, que no depende de la distancia), circularidad (con `cv2.arcLength`), solidez, relación de aspecto (`cv2.boundingRect`) y ajuste a elipse (`cv2.fitEllipse`), más estricta para candidatos solo verdes.
+**Detección (no solo por color):** HSV + `cv2.inRange` (rojo en dos intervalos, naranja, verde) → la máscara verde se restringe a zonas lisas (`cv2.threshold` sobre la desviación estándar local) y se corta por bordes `cv2.Canny` → apertura/cierre (`cv2.morphologyEx`) → componentes con `cv2.findContours` (`RETR_CCOMP`) → watershed (`cv2.distanceTransform` + `cv2.watershed`) para frutos pegados → **oclusión**: un fruto convexo tapado por tallos o por otro fruto se valida y se mide con su envolvente convexa (`cv2.convexHull`); si la envolvente es redonda (área / círculo mínimo `cv2.minEnclosingCircle` ≥ 0.68) es un solo fruto tapado y no se divide; el color para la madurez se toma solo de los píxeles visibles → unión de la parte verde y roja de un pintón → validación con área (`cv2.contourArea`; además, un área mínima *relativa* a la mediana de los frutos de la misma foto, que no depende de la distancia), circularidad (con `cv2.arcLength`), solidez, relación de aspecto (`cv2.boundingRect`) y ajuste a elipse (`cv2.fitEllipse`), más estricta para candidatos solo verdes.
 
 **Madurez:** porcentaje de píxeles de cada clase de color del perfil dentro de la máscara (excluyendo reflejos y sombras) + reglas por etapa configurables. Con etiquetas manuales, se comparan SVM, k-NN y árbol de decisión mediante validación cruzada estratificada.
 
-**Estéreo:** `cv2.calibrateCamera` (K, distorsión) → `cv2.stereoCalibrate` / `cv2.solvePnP` / `cv2.findEssentialMat`+`cv2.recoverPose` (R, T) → `cv2.stereoRectify` + `cv2.initUndistortRectifyMap` + `cv2.remap` → `cv2.StereoSGBM` → `cv2.reprojectImageTo3D` (Z = f·B/d). Tamaño físico = tamaño_px · Z / f usando la mediana de Z dentro de cada fruto.
+**Estéreo (sin tablero):** K por focal equivalente / campo de visión → `cv2.findEssentialMat`+`cv2.recoverPose` (R, dirección de T; escala = línea base medida) → `cv2.stereoRectify` + `cv2.initUndistortRectifyMap` + `cv2.remap` → `cv2.StereoSGBM` → `cv2.reprojectImageTo3D` (Z = f·B/d). Tamaño físico = tamaño_px · Z / f usando la mediana de Z dentro de cada fruto.
 
 ## 5. Estado del proyecto
 
 | Componente | Implementado | Verificado | Cómo se verificó / qué falta |
 |---|---|---|---|
 | Carga, preprocesamiento, espacios de color | ✅ | ✅ sintético | Notebook ejecutado de principio a fin |
-| Segmentación, watershed, conteo | ✅ | ✅ sintético · ✅ 1 foto real por fruta | Sintético: 7/7 tomates. Foto real de tomates: F1 = 0.77 (5/8, 0 falsos). **Ajustado con una sola foto: falta validar con fotos nuevas** |
-| Características y reglas de madurez | ✅ | ✅ sintético · ⏳ foto real | 7/7 categorías correctas en la escena sintética |
+| Segmentación, watershed, conteo | ✅ | ✅ sintético · ✅ 1 foto real por fruta | Sintético: 7/7 tomates. Foto real de tomates: F1 = 0.86 (6/8, 0 falsos; antes 0.77). Los 2 perdidos están tapados más de la mitad. **Ajustado con una sola foto: falta validar con fotos nuevas** |
+| Características y reglas de madurez | ✅ | ✅ sintético · ✅ foto real | Sintético 7/7. Foto real de tomates: 6/6 frutos detectados con la etapa anotada (Verde 2, Pintón 1, Maduro 3) |
 | Perfil banano | ✅ | ✅ sintético · ✅ 1 foto real | Foto real (`bananos_separados.jpeg`): 4/4, 0 falsos (F1 = 1.00). Bananos pegados: no se separan. **Falta probar bananos verdes y amarillos sin manchas** |
 | SVM / k-NN / árbol | ✅ | ⏳ | Requiere etiquetas reales en `data/etiquetas_madurez_<fruta>.csv` |
 | Calibración intrínseca | ✅ | ✅ sintético | Recupera f con error < 2 % (RMS ≈ 0.1 px) |
 | `stereoCalibrate` (cámaras distintas) | ✅ | ✅ sintético | Línea base recuperada 100,0 mm (real 100) con f distintas |
 | Pose por tablero / matriz esencial | ✅ | ✅ sintético · ❌ par real | Sintético: línea base ±3 %, error epipolar < 1 px. Primer par real (iPhone 15) inservible: el celular giró 21° entre fotos. **Repetir el par** |
 | Calibración aproximada sin tablero (focal del EXIF/ficha) | ✅ | ✅ sintético | Sin tablero: profundidad ≈ +4 %, diámetro ~±10 % |
+| PC + celular sin tablero (FOV + matriz esencial, K distinta por cámara) | ✅ | ✅ sintético · ⏳ DroidCam | Sintético con f = 900 y 1050 px: Z ±6 %, error epipolar < 1 px. Falta capturar con DroidCam |
 | Rectificación + SGBM + profundidad | ✅ | ✅ sintético | Plano a distancia conocida: Z ±2 %; cadena completa: Z ±5 %, diámetro ±8 % |
 | Captura PC + celular | ✅ | ✅ webcam · ⏳ celular | Webcam del PC probada con `probar_camara.py` (720p a 8 FPS, 480p a 30 FPS). Falta conectar el celular |
 | Evaluación (conteo, P/R, confusión, errores) | ✅ | ⏳ | Requiere conteos, anotaciones y medidas reales |

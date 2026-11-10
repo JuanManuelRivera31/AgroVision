@@ -1,114 +1,183 @@
 # AgroVisión — estado del proyecto (para el equipo)
 
-*Actualizado: 1 de noviembre de 2026. Lo más reciente va primero; debajo está la bitácora
-de cada sesión.*
+*Actualizado: 8 de noviembre de 2026. Entrega: martes 10 de noviembre. Lo más reciente va
+primero; debajo está la bitácora de cada sesión.*
 
 ## Qué es
 
-Proyecto universitario en Python + OpenCV **clásico** (sin redes neuronales): detecta frutos
-en una foto, los cuenta, clasifica su madurez y, con dos fotos (estéreo), estima la
-distancia y el tamaño en milímetros. Sirve para cualquier fruta: lo que depende de la
-fruta está en `perfiles/<fruta>.json` (hoy hay `tomate` y `banano`). Todo está en
-español. El README explica el método completo.
+Proyecto universitario en Python + OpenCV **clásico** (sin redes neuronales). Se toma una
+foto con el celular por DroidCam y el sistema detecta los frutos, los cuenta, clasifica su
+madurez y estima su tamaño. Sirve para cualquier fruta: lo que depende de la fruta está en
+`perfiles/<fruta>.json` (hoy hay `tomate` y `banano`). Todo está en español. El README
+explica el método completo.
 
-## Cómo arrancar (Windows)
+## Estado para la entrega
+
+**El flujo principal funciona de punta a punta**: foto por DroidCam → detección → conteo →
+madurez → tamaño aproximado, todo evaluado en el notebook sobre la foto recién tomada.
+**Listo para entregar.** Se probó con el celular real desde el notebook el 8 de noviembre y
+funcionó. Quedan dos confirmaciones que mejoran el tamaño, pero no impiden entregar: ver
+"Antes de entregar".
+
+## Cómo correrlo
+
+Primera vez, en Windows:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
 .\.venv\Scripts\python -m ipykernel install --user --name agrovision --display-name "Python (AgroVision)"
-.\.venv\Scripts\python -m pytest -q                       # deben pasar 19
+.\.venv\Scripts\python -m pytest -q                       # deben pasar 23
 ```
 
-Luego abrir `AgroVision.ipynb` en VS Code con el kernel **Python (AgroVision)** y
-ejecutar todo. Por defecto analiza `bananos_separados.jpeg` con el perfil `banano`
-(Etapa 1: `FRUTA` y `NOMBRE_IMAGEN`; para tomates: `"tomate"` y `"tomates.jpg"`).
+Cada vez que se use:
+
+1. Abrir la app DroidCam en el celular, con el celular y el PC en la misma red Wi-Fi.
+   La IP que muestra la app debe coincidir con `ORIGEN_CELULAR` en `agrovision/config.py`
+   (hoy `http://192.168.1.2:4747/video`).
+2. Celular mirando hacia abajo, a unos 27 cm de la mesa.
+3. Abrir `AgroVision.ipynb` en VS Code con el kernel **Python (AgroVision)** y pulsar
+   **Run All**.
+4. En la ventana de la cámara, pulsar **ESPACIO** para tomar la foto (`q` cancela y usa la
+   última). El notebook sigue solo y evalúa esa foto.
+
+Para evaluar una imagen ya guardada: en la Etapa 1, `TOMAR_FOTO = False` y su nombre en
+`NOMBRE_IMAGEN`. Versión rápida sin notebook: `.\.venv\Scripts\python herramientas/tomar_foto.py`.
 
 ## Qué funciona (medido)
 
 | Parte | Resultado | Cómo verlo |
 |---|---|---|
-| Detección de bananos (foto real) | 4/4, 0 falsos positivos, F1 = 1.00 | `herramientas/banco.py --fruta banano --imagen bananos_separados.jpeg` |
-| Detección de tomates (foto real a contraluz) | 5/8, 0 falsos positivos, F1 = 0.77 | `herramientas/banco.py` |
-| Madurez por color | Bananos: café 20–35 % → Sobremaduro (coincide con lo que se ve) | Notebook, Etapa 4 |
-| Escenas sintéticas | 7/7 tomates, 5/5 bananos | `pytest` |
-| Estéreo (sintético) | Con tablero: Z ±5 %, diámetro ±8 %. Sin tablero: Z ≈ +4 %, diámetro ~±10 % | `pytest` |
-| Notebook | 24/24 celdas sin errores | — |
+| Foto real por DroidCam (5 tomates en bandeja) | 5/5 detectados, 0 falsos, IoU medio 0.98 contra cajas marcadas a ojo | Notebook con `foto_20261108_140128.png` |
+| Madurez de esa foto | 3 Maduros, 2 Pintones. Sin etapa anotada: revisado solo a ojo | Notebook, Etapa 4 |
+| Tamaño de esa foto | 5.0 a 5.8 cm. El tomate 1 es la referencia (5.5 cm), así que aún no hay validación independiente | Notebook, Etapa 7 |
+| Segunda foto por DroidCam, tomates en otra posición, sin tocar parámetros | 5/5, error de conteo 0, cajas revisadas a ojo. El tomate amarillo da 5.5 cm en una foto y 5.8 cm en la otra | Notebook con `foto_20261108_145428.png` |
+| Detección de tomates (`tomates.jpg`, foto real) | 7/8, 0 falsos, F1 = 0.93 | `herramientas/banco.py` |
+| Madurez de tomates (`tomates.jpg`) | 7/7 contra la etapa anotada en las cajas | Notebook, Etapa 8.1 |
+| Detección de bananos (foto real) | 4/4, 0 falsos, F1 = 1.00 | `herramientas/banco.py --fruta banano --imagen bananos_separados.jpeg` |
+| Transmisión DroidCam por Wi-Fi | 1280x720, 30 fps | `herramientas/probar_camara.py` |
+| Pruebas automáticas | 23/23 | `pytest` |
+| Notebook | Ejecutado completo sin errores | — |
 
-## Lista de tareas
+## Cómo se mide el tamaño
 
-Marcar con `[x]` al terminar y anotar debajo de la tarea quién la hizo y qué salió.
-Las que necesitan el celular o los frutos físicos dicen **(con fotos)**; las demás se
-pueden hacer solo con el computador.
+El celular queda a una altura fija H, mirando hacia abajo. H = 27.45 cm se dedujo de un
+tomate de 5.5 cm medido con regla (`ALTURA_CELULAR_CM` en `agrovision/config.py`). Con el
+modelo pinhole y el fruto apoyado en la mesa: **D = d_px · H / (f + d_px/2)**, donde f sale
+de la focal del iPhone (26 mm equivalentes). Además, cada fruto sale como **Pequeño, Mediano
+o Grande** (±10 % de la mediana de la foto), etiqueta que no depende de la altura. No se usa
+tablero de calibración.
 
-### Hecho
+## Antes de entregar
 
-- [x] Sistema para cualquier fruta: perfiles `perfiles/tomate.json` y `perfiles/banano.json`
-- [x] Detección de tomates ajustada con la foto real: F1 = 0.77 (antes 0.12)
-- [x] Filtro de área relativa (`area_min_rel`): no depende de la distancia a los frutos
-- [x] Detección de bananos ajustada con foto real: F1 = 1.00 (`bananos_separados.jpeg`)
-- [x] Cajas reales anotadas en `data/anotaciones_cajas.csv` (8 tomates, 4 bananos)
-- [x] Estéreo sin tablero: calibración aproximada con la focal del iPhone 15 (26 mm)
-- [x] Pose estéreo estable (emparejamiento determinista + RANSAC → LMEDS)
-- [x] Bug del error por foto en la calibración corregido (salía ~150 px en vez de ~0.1)
-- [x] Herramientas: `banco.py`, `buscar_parametros.py`, `revisar_tablero.py`, `probar_camara.py`
-- [x] Tablero imprimible a tamaño real (`data/calibracion/tablero_9x6_25mm_carta.pdf`), por si se consigue impresora
-- [x] Aviso en el notebook cuando el celular gira más de 5° entre las dos fotos estéreo
-- [x] Notebook re-ejecutado: 24/24 celdas sin errores · 19/19 pruebas
+- [ ] **Confirmar la referencia.** Se tomó como tomate de 5.5 cm el de arriba a la izquierda
+      de `foto_20261108_140128.png` (id 1). Si fue otro, recalcular `ALTURA_CELULAR_CM`.
+- [x] **Prueba con el celular** desde el notebook: foto tomada y evaluada completa (8 nov).
+- [ ] **1 o 2 fotos nuevas** para comprobar la detección sin tocar parámetros (ya hay una).
+- [ ] **Validar el tamaño:** medir con regla otro tomate distinto al de referencia y
+      comparar con lo que da el sistema.
+- [x] **Conteo manual:** `CONTEO_MANUAL = 5` en la Etapa 8.1. Si cambia la cantidad de frutos
+      en la foto, hay que actualizarlo.
 
-### Pendiente
+**Cuidado en la demo:** apuntar siempre a frutos. Una foto accidental del piso y un pie
+(`foto_20261108_145132.png`) dio 12 detecciones falsas: tonos beige y piel caen en el rango
+naranja, y el sistema no sabe que ahí no hay frutos.
 
-- [ ] **1. Repetir el par estéreo (con fotos).** El primero no sirvió: el celular giró 21°
-      (ver la sección "Primer par estéreo real"). Montaje para el iPhone 15:
-  - [ ] Celular acostado (horizontal), apoyado contra un libro que sirve de riel
-  - [ ] Bananos separados sobre la bolsa blanca, a 50–60 cm del celular
-  - [ ] Cámara en 1x, formato normal 4:3 (no panorámica), sin flash, bloqueo AE/AF
-  - [ ] Foto 1 → deslizar a la derecha **sin girar ni levantar** el largo de una tarjeta
-        bancaria (85.6 mm, marcado con dos monedas) → foto 2
-  - [ ] Pasar por cable (no WhatsApp) a `data/estereo/izquierda/par1.jpg` y
-        `data/estereo/derecha/par1.jpg` (mismo nombre)
-  - [ ] Correr el notebook: el giro debe salir < 5° y el error vertical < 1 px (Etapa 6.3)
-- [ ] **2. Medidas reales para validar (con fotos).** Medir con regla el largo de cada banano
-      del par y la distancia del celular → `data/medidas_reales.csv`
-      (`imagen,id,diametro_real_mm,profundidad_real_mm`). La Etapa 8 calcula el error.
-- [ ] **3. Bananos de otras etapas (con fotos).** Una foto con bananos verdes y amarillos sin
-      manchas, separados y sobre fondo claro → `data/imagenes/`, anotar sus cajas y medir
-      con `banco.py` sin reajustar. Hoy solo se probaron bananos con manchas.
-- [ ] **4. Fotos de validación.** Cada perfil se ajustó con UNA foto. Medir con 3–5 fotos
-      nuevas por fruta **sin tocar parámetros**: anotar cajas en `data/anotaciones_cajas.csv`
-      y correr `banco.py --fruta <fruta> --imagen <foto>`. Pueden ser de internet (Kaggle,
-      "banana ripeness"), citando la fuente.
-- [ ] **5. Etiquetas para el clasificador ML.** Llenar `categoria_real` en
-      `data/etiquetas_madurez_<fruta>.csv` (≥ 5 por clase) y correr la Etapa 4.1
-      (compara SVM, k-NN y árbol con validación cruzada).
-- [ ] **6. Conteo manual.** Poner `CONTEO_MANUAL` en la Etapa 8.1 (bananos_separados: 4).
-- [ ] **7. Preparar la sustentación:** resultados de las tareas 1–5 + las limitaciones de
-      abajo.
-- [ ] *Opcional:* Modo 3 (PC + celular en vivo con Iriun o DroidCam:
-      `herramientas/probar_camara.py --listar`).
-- [ ] *Opcional:* separar bananos pegados (`bananos.jpeg`). Se probó sembrar el watershed
-      con núcleos claros (V > 60): da 4 núcleos, pero las puntas que se tocan los unen. Sin
-      resolver.
+## Opcional (no bloquea la entrega)
+
+- [ ] Etiquetas para el clasificador ML: llenar `categoria_real` en
+      `data/etiquetas_madurez_<fruta>.csv` (≥ 5 por clase) y correr la Etapa 4.1. Hoy el
+      notebook muestra este componente como pendiente; la madurez se decide por reglas.
+- [ ] Estéreo real (Modos 2 y 3): el código está y pasa las pruebas sintéticas, pero no
+      tiene un par real válido. El notebook lo reporta como pendiente.
+- [ ] Bananos verdes y amarillos sin manchas: solo se probaron bananos con manchas.
+- [ ] Separar bananos pegados (`bananos.jpeg`): sin resolver.
 
 ## Limitaciones a declarar en la sustentación
 
-- Ajuste de parámetros con una sola foto por fruta: es ajuste, no validación.
-- Bananos que se tocan forman una sola mancha y no se separan (el watershed busca
-  centros de frutos redondos).
-- Sin tablero, la calibración es aproximada (focal de la ficha técnica, sin distorsión).
-- Dos fotos con el mismo celular no equivalen a dos cámaras simultáneas: si algo se mueve
-  entre fotos, falla.
+- Los parámetros del perfil de tomate se ajustaron con dos fotos: es ajuste, no validación.
+- El tamaño es **aproximado**: usa una sola referencia, la focal de ficha técnica y supone
+  el celular a la misma altura en todas las fotos.
+- El límite Pintón/Maduro depende del umbral elegido (Maduro = rojo ≥ 25 % y verde ≤ 15 %),
+  porque la madurez se decide por color.
+- En una escena sin frutos, con tonos beige o piel, aparecen detecciones falsas.
+- Bananos que se tocan forman una sola mancha y no se separan.
 - Un fruto mucho más lejano que el resto (menos de la mitad del área típica) se descarta
   por el filtro de área relativa.
+- El clasificador ML y el estéreo real no están validados con datos reales.
 
 ## Herramientas (`herramientas/`)
 
 | Script | Para qué |
 |---|---|
-| `banco.py` | Mide precisión/recall/F1 de un perfil contra `data/anotaciones_cajas.csv` (`--vista` dibuja aciertos y fallos) |
-| `buscar_parametros.py` | Búsqueda aleatoria de parámetros de un perfil (foto real + escena sintética) |
-| `revisar_tablero.py` | Revisa fotos del tablero antes de calibrar; `--pdf` genera el tablero imprimible |
-| `probar_camara.py` | Prueba cámaras en vivo (Modo 3): FPS, desfase, veredicto |
+| `tomar_foto.py` | Foto por DroidCam y análisis inmediato, sin notebook |
+| `probar_camara.py` | Prueba cámaras en vivo: resolución, FPS, desfase |
+| `banco.py` | Mide precisión/recall/F1 de un perfil contra `data/anotaciones_cajas.csv` |
+| `buscar_parametros.py` | Búsqueda aleatoria de parámetros de un perfil |
+| `revisar_tablero.py` | Ya no se usa: el proyecto trabaja sin tablero |
+
+---
+
+# Prueba final con el celular — 8 nov 2026: FUNCIONÓ
+
+Run All en el notebook → se abre la cámara de DroidCam → ESPACIO → el notebook evalúa esa
+foto completa. Foto: `foto_20261108_145428.png` (1280x720, Wi-Fi), con los tomates en otra
+posición que en la foto usada para ajustar y sin tocar parámetros.
+
+| Tomate | Posición | Madurez | Tamaño relativo | Diámetro aprox. |
+|---|---|---|---|---|
+| 1 | Arriba izquierda | Maduro | Mediano | 5.5 cm |
+| 2 | Arriba derecha | Maduro | Mediano | 5.3 cm |
+| 3 | Centro (amarillo) | Pintón | Mediano | 5.8 cm |
+| 4 | Abajo derecha | Maduro | Grande | 6.1 cm |
+| 5 | Abajo izquierda | Pintón | Mediano | 5.2 cm |
+
+- Conteo: 5 de 5, error 0 (`CONTEO_MANUAL = 5`).
+- Repetibilidad: el tomate amarillo, el único reconocible a simple vista en las dos fotos,
+  dio 5.5 cm y 5.8 cm: unos 3 mm de diferencia.
+- Resultados guardados: `resultados/detecciones/foto_20261108_145428_detecciones.png` y
+  `foto_20261108_145428_medidas.png`.
+- Sin confirmar: qué tomate fue el de 5.5 cm (se asumió el de arriba a la izquierda de
+  `foto_20261108_140128.png`) y la medida con regla de un segundo tomate.
+
+---
+
+# Foto directa con DroidCam — 8 nov 2026 (entrega: martes 10 nov)
+
+`herramientas/tomar_foto.py`: vista en vivo, ESPACIO toma la foto y el sistema detecta,
+cuenta y clasifica solo. Amplía las imágenes pequeñas a `lado_max` porque los parámetros
+están en píxeles a esa escala. Simulando 640x480 con `tomates.jpg`: 5 de 6 detecciones
+(4 sin ampliar) y madurez menos exacta que con la foto original.
+
+Primera foto real por DroidCam (1280x720, 5 tomates en bandeja de plástico):
+- Perdía el del centro (amarillo, tono 18-28) y los reflejos rojos del plástico inflaban
+  las cajas. Perfil: rojo/naranja con S >= 130 y V >= 110, naranja hasta H = 28. Si varios
+  frutos en corro forman una mancha redonda, ahora se dividen cuando cada parte es redonda.
+- Resultado: 5/5, IoU medio 0.98. `tomates.jpg`: F1 0.93 (antes 0.86), 7/7 con la madurez
+  anotada. Ajustado con estas dos fotos: falta validar con fotos nuevas.
+- Madurez: Maduro = rojo >= 25 % y verde <= 15 %.
+- El notebook toma la foto (`TOMAR_FOTO = True`) y evalúa la última; medida con una sola
+  foto cenital: D = d_px·H / (f + d_px/2). H = 27.45 cm, deducida de un tomate de 5.5 cm
+  medido con regla (el superior izquierdo). Tamaño aproximado: una sola referencia.
+
+---
+
+# Se elimina el tablero; Modo 3 con DroidCam — 5 nov 2026
+
+Decisión: **no se imprime ni se usa tablero**. El estéreo se hace con la webcam del PC
+(izquierda) + el celular por DroidCam (derecha). 22/22 pruebas; notebook sin errores.
+
+- `estereo.calibracion_por_fov()`: K a partir del campo de visión (webcam: ficha técnica).
+- `estereo.fov_horizontal_desde_f35()`: FOV horizontal del celular desde su focal
+  equivalente (el video 16:9 conserva el ángulo horizontal del sensor 4:3).
+- `estereo.pose_por_esencial(..., cal_der=)`: acepta una K distinta para la cámara derecha.
+- Notebook: se quitó la celda que generaba el tablero; 6.1 explica la calibración sin
+  tablero (tabla con/sin); 6.2 y 6.3 (Modo 2) solo usan focal + línea base; 6.4 (Modo 3)
+  captura solo pares de la escena y calcula la pose del último par.
+- Prueba nueva con dos cámaras de focales distintas (900 y 1050 px): Z ±6 %, error
+  epipolar < 1 px.
+- Punto para la sustentación: el tamaño físico = tamaño_px · B / d, así que un error en
+  la focal casi no afecta los diámetros; sí afecta la profundidad Z.
 
 ---
 

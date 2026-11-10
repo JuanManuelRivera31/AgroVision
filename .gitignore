@@ -1,16 +1,5 @@
-# Entorno virtual
 .venv/
-venv/
-
-# Cachés de Python / pytest
 __pycache__/
-*.py[cod]
+*.pyc
 .pytest_cache/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Sistema operativo
-.DS_Store
-Thumbs.db
-desktop.ini
+.vscode/

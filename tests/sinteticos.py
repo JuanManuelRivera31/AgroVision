@@ -209,13 +209,17 @@ def lamina_tomates_y_tablero(patron: PatronCalibracion, mm_por_px=0.5):
     return textura, tomates, origen
 
 
-def par_estereo_lamina(patron: PatronCalibracion, K, tam, B=60.0, Z=800.0, mm_por_px=0.5):
-    """Par izquierda/derecha de la lámina vista por dos cámaras paralelas separadas B mm."""
+def par_estereo_lamina(patron: PatronCalibracion, K, tam, B=60.0, Z=800.0, mm_por_px=0.5,
+                       K_der=None):
+    """Par izquierda/derecha de la lámina vista por dos cámaras paralelas separadas B mm.
+
+    ``K_der``: intrínsecos de la cámara derecha si es distinta de la izquierda.
+    """
     textura, tomates, _ = lamina_tomates_y_tablero(patron, mm_por_px)
     alto_mm, ancho_mm = textura.shape[0] * mm_por_px, textura.shape[1] * mm_por_px
     rvec = np.array([0.04, -0.05, 0.0])
     t_i = np.array([-ancho_mm / 2, -alto_mm / 2, Z])
     t_d = t_i + np.array([-B, 0.0, 0.0])
     izq = render_textura_plana(textura, mm_por_px, K, tam, rvec, t_i)
-    der = render_textura_plana(textura, mm_por_px, K, tam, rvec, t_d)
+    der = render_textura_plana(textura, mm_por_px, K if K_der is None else K_der, tam, rvec, t_d)
     return izq, der, tomates

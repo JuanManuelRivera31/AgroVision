@@ -77,6 +77,41 @@ def _es_windows() -> bool:
     return os.name == "nt"
 
 
+def capturar_foto(fuente: FuenteCamara, ventana: str = "AgroVision - ESPACIO: tomar foto, q: salir",
+                  ancho_vista: int = 1000):
+    """Vista en vivo hasta pulsar ESPACIO (devuelve el fotograma) o q/ESC (devuelve None)."""
+    cv2.namedWindow(ventana, cv2.WINDOW_AUTOSIZE)
+    cv2.setWindowProperty(ventana, cv2.WND_PROP_TOPMOST, 1)
+    while True:
+        frame, _ = fuente.ultimo()
+        f = ancho_vista / frame.shape[1]
+        cv2.imshow(ventana, cv2.resize(frame, None, fx=f, fy=f))
+        k = cv2.waitKey(30) & 0xFF
+        if k == 32:
+            return frame
+        if k in (ord("q"), 27):
+            return None
+
+
+def guardar_foto(frame: np.ndarray, carpeta: Path) -> Path:
+    ruta = carpeta / datetime.now().strftime("foto_%Y%m%d_%H%M%S.png")
+    guardar_imagen(ruta, frame)
+    return ruta
+
+
+def tomar_foto(origen: int | str, carpeta: Path) -> Path | None:
+    """Abre la cámara, espera ESPACIO y guarda la foto. None si se cancela con q."""
+    camara = FuenteCamara(origen, "celular", resolucion=(1280, 720))
+    try:
+        camara.ultimo(espera_max=8.0)
+        frame = capturar_foto(camara)
+        return guardar_foto(frame, carpeta) if frame is not None else None
+    finally:
+        camara.cerrar()
+        cv2.destroyAllWindows()
+        cv2.waitKey(1)
+
+
 class ParEstereo:
     """Dos fuentes como cámara izquierda/derecha (intercambiables)."""
 

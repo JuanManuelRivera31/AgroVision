@@ -9,6 +9,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -49,6 +50,25 @@ def test_cargar_perfil_cambia_solo_los_colores_indicados():
     assert p.area_min_frac == 0.006
     with pytest.raises(ValueError):
         cargar_perfil("tomate", parametro_inexistente=1)
+
+
+def test_tomate_tapado_por_tallos_se_detecta_entero():
+    """Tres tallos "muerden" un tomate (como los sépalos de la foto real). Con la
+    envolvente convexa se detecta UN fruto con su caja completa; sin ella el
+    watershed lo parte en trozos que no corresponden a ningún fruto."""
+    img = np.full((480, 640, 3), (150, 150, 150), np.uint8)
+    cv2.circle(img, (320, 240), 90, (30, 30, 200), cv2.FILLED)
+    for a, b in [((200, 150), (285, 210)), ((440, 150), (355, 210)), ((320, 360), (320, 290))]:
+        cv2.line(img, a, b, (30, 90, 30), 26)
+    caja_real = (230, 150, 180, 180)
+
+    res = segmentar(img, TOMATE.segmentacion)
+    assert res.conteo == 1, [r.motivo for r in res.rechazadas]
+    assert iou(res.detecciones[0].bbox, caja_real) > 0.9
+
+    sin_env = cargar_perfil("tomate", usar_envolvente=False, redondez_envolvente_unico=0)
+    trozos = segmentar(img, sin_env.segmentacion).detecciones
+    assert all(iou(d.bbox, caja_real) < 0.5 for d in trozos)
 
 
 def test_deteccion_y_clasificacion_bananos_sinteticos():
@@ -372,6 +392,55 @@ def test_pose_por_esencial_y_rectificacion_no_calibrada():
 
     ri, rd, info_nc = est.rectificacion_no_calibrada(izq, der)
     assert est.error_epipolar_vertical(ri, rd)["mediana_px"] < 1.0
+
+
+def test_medir_por_altura_fruto_apoyado():
+    """Esfera de 70 mm sobre la mesa, lente a 350 mm: su contorno está a Z = 315 mm."""
+    f = 961.5
+    d_px = 70.0 * f / 315.0
+    fila = {"id": 1, "diametro_equiv_px_orig": d_px, "ancho_bbox_px_orig": d_px, "alto_bbox_px_orig": d_px}
+    m = est.medir_por_altura(pd.DataFrame([fila]), 350.0, f).iloc[0]
+    assert m["diametro_equiv_mm"] == pytest.approx(70.0)
+    assert m["profundidad_mm"] == pytest.approx(315.0)
+    assert m["ancho_mm"] == pytest.approx(70.0)
+    filas = [{**fila, "id": i, "diametro_equiv_px_orig": d_px * k} for i, k in enumerate((0.7, 1.0, 1.0, 1.3))]
+    assert est.medir_por_altura(pd.DataFrame(filas), 350.0, f)["tamano_relativo"].tolist() == \
+        ["Pequeño", "Mediano", "Mediano", "Grande"]
+
+
+def test_calibracion_por_fov():
+    K, tam = sin.camara_virtual(f=1100.0)
+    fov_h = np.degrees(2 * np.arctan(tam[0] / 2 / 1100.0))
+    assert est.calibracion_por_fov(tam, fov_h).K[0, 0] == pytest.approx(1100.0, rel=1e-6)
+    fov_d = np.degrees(2 * np.arctan(np.hypot(*tam) / 2 / 1100.0))
+    assert est.calibracion_por_fov(tam, fov_d, "diagonal").K[0, 0] == pytest.approx(1100.0, rel=1e-6)
+    # Foto 4:3 a pantalla completa: misma focal por f35 (diagonal) que por FOV horizontal.
+    f35 = 1100.0 * 43.267 / np.hypot(*tam)
+    fov_f35 = est.fov_horizontal_desde_f35(f35, aspecto_sensor=tam[0] / tam[1])
+    assert fov_f35 == pytest.approx(fov_h, rel=1e-4)
+
+
+def test_pose_por_esencial_dos_camaras_distintas_sin_tablero():
+    """Modo 3: webcam del PC (izquierda) y celular por DroidCam (derecha) con focales distintas."""
+    patron = PatronCalibracion((9, 6), 25.0)
+    tam = (1280, 720)
+    K_pc = np.array([[900.0, 0, 640], [0, 900.0, 360], [0, 0, 1]])
+    K_cel = np.array([[1050.0, 0, 640], [0, 1050.0, 360], [0, 0, 1]])
+    izq, der, _ = sin.par_estereo_lamina(patron, K_pc, tam, B=100.0, Z=800.0, K_der=K_cel)
+    cal_pc = est.calibracion_por_fov(tam, np.degrees(2 * np.arctan(640 / 900.0)))
+    cal_cel = est.calibracion_por_fov(tam, np.degrees(2 * np.arctan(640 / 1050.0)))
+
+    ce, _ = est.pose_por_esencial(izq, der, cal_pc, 100.0, cal_der=cal_cel)
+    assert ce.T.ravel()[0] / np.linalg.norm(ce.T) == pytest.approx(-1.0, abs=0.05)
+    assert np.degrees(np.linalg.norm(cv2.Rodrigues(ce.R)[0])) < 0.3
+    rect = est.calcular_rectificacion(ce)
+    ri, rd = est.rectificar_par(izq, der, rect)
+    assert est.error_epipolar_vertical(ri, rd)["mediana_px"] < 1.0
+    z = est.nube_3d(est.calcular_disparidad(ri, rd), rect.Q)[..., 2]
+    assert np.nanmedian(z) == pytest.approx(800, rel=0.06)
+
+    with pytest.raises(ValueError):
+        est.pose_por_esencial(izq, der, cal_pc, 100.0, cal_der=est.calibracion_por_fov((640, 360), 60))
 
 
 def test_pose_por_esencial_estable_y_profundidad_sin_tablero():

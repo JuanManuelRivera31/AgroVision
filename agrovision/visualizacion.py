@@ -70,6 +70,19 @@ def dibujar_detecciones(img: np.ndarray, detecciones: list, df: pd.DataFrame | N
     return salida
 
 
+def dibujar_diametros(img: np.ndarray, detecciones: list, medidas: pd.DataFrame) -> np.ndarray:
+    """Escribe el diámetro en cm dentro de la caja de cada fruto."""
+    salida = img.copy()
+    cm = dict(zip(medidas["id"], medidas["diametro_equiv_mm"] / 10))
+    for d in detecciones:
+        x, y, w, h = d.bbox
+        pos = (x + 8, y + h - 10)
+        texto = f"D={cm[d.id]:.1f} cm"
+        cv2.putText(salida, texto, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 5, cv2.LINE_AA)
+        cv2.putText(salida, texto, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+    return salida
+
+
 def superponer_mascara(img: np.ndarray, mascara: np.ndarray,
                        color=(255, 0, 255), alfa: float = 0.45) -> np.ndarray:
     capa = img.copy()

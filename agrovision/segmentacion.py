@@ -97,6 +97,12 @@ def ajuste_elipse(c: np.ndarray, bbox: tuple) -> float:
     return inter / union if union else 0.0
 
 
+def redondez(c: np.ndarray) -> float:
+    """Área del contorno / área del círculo mínimo que lo encierra (1 = círculo)."""
+    _, r = cv2.minEnclosingCircle(c)
+    return cv2.contourArea(c) / (np.pi * r * r) if r > 0 else 0.0
+
+
 def metricas_contorno(c: np.ndarray, con_elipse: bool = False) -> dict:
     """Métricas de forma con cv2.contourArea, cv2.arcLength y cv2.boundingRect.
 
@@ -174,13 +180,13 @@ def separar_watershed(mascara: np.ndarray, img_bgr: np.ndarray,
     if n <= 2:  # fondo + una sola semilla
         return [mascara]
 
-    marcadores = marcadores + 1                    # fondo -> 1, semillas -> 2..n
-    desconocido = cv2.subtract(mascara, picos)
-    marcadores[desconocido == 255] = 0             # lo que watershed debe decidir
+    # Sin marcador de fondo: si el fondo compitiera, se quedaría con el fruto que
+    # no recibió semilla y ese fruto desaparecería. Watershed inunda todo el
+    # recorte desde las semillas (1..n-1) y luego se recorta a la máscara.
     marcadores = cv2.watershed(img_bgr.copy(), marcadores.astype(np.int32))
 
     regiones = []
-    for etiqueta in range(2, n + 1):
+    for etiqueta in range(1, n):
         r = ((marcadores == etiqueta) & (mascara > 0)).astype(np.uint8) * 255
         if cv2.countNonZero(r) > 0:
             regiones.append(r)
@@ -257,7 +263,8 @@ def segmentar(img_bgr: np.ndarray, p: ParametrosSegmentacion) -> ResultadoSegmen
     # 5) Watershed sobre cada candidato poco sólido
     area_min, area_max = p.area_min_frac * area_img, p.area_max_frac * area_img
     rechazadas: list[Rechazo] = []
-    reg_distintivas = _dividir_candidatos(cand_distintivos, img, p, area_min, area_max, rechazadas)
+    reg_distintivas = _dividir_candidatos(cand_distintivos, img, p, area_min, area_max,
+                                          rechazadas, distintivos=True)
     reg_verdes = _dividir_candidatos(cand_verdes, img, p, area_min, area_max, rechazadas)
 
     # 6) Frutos a medio madurar: la parte verde y la parte distintiva salen como
@@ -267,13 +274,19 @@ def segmentar(img_bgr: np.ndarray, p: ParametrosSegmentacion) -> ResultadoSegmen
     # 7) Validación geométrica
     aceptadas: list[tuple] = []
     for cr, dividida in reg_distintivas + reg_verdes:
-        mr = metricas_contorno(cr)
-        rx, ry, rw, rh = mr["bbox"]
-        mask_r = np.zeros((rh, rw), np.uint8)
-        cv2.drawContours(mask_r, [_desplazar(cr, -rx, -ry)], -1, 255, cv2.FILLED)
-        n_px = max(cv2.countNonZero(mask_r), 1)
-        frac_distintiva = cv2.countNonZero(
-            cv2.bitwise_and(distintiva[ry:ry + rh, rx:rx + rw], mask_r)) / n_px
+        mr, mask_r, frac_distintiva = _medir_region(cr, distintiva)
+        if p.usar_envolvente and frac_distintiva >= 0.10:
+            # Fruto de color distintivo tapado por tallos u otro fruto: se valida
+            # (y se mide) con su envolvente convexa. Los verdes no: la envolvente
+            # de un trozo de hoja también puede parecer redonda.
+            # La máscara (de la que salen los colores para la madurez) se queda con
+            # los píxeles visibles del fruto: la envolvente incluiría los tallos.
+            visible = cr
+            cr = cv2.convexHull(cr)
+            mr = metricas_contorno(cr)
+            rx, ry, rw, rh = mr["bbox"]
+            mask_r = np.zeros((rh, rw), np.uint8)
+            cv2.drawContours(mask_r, [_desplazar(visible, -rx, -ry)], -1, 255, cv2.FILLED)
 
         motivo = _validar(cr, mr, frac_distintiva, area_min, area_max, p, dividida)
         if motivo:
@@ -296,6 +309,17 @@ def segmentar(img_bgr: np.ndarray, p: ParametrosSegmentacion) -> ResultadoSegmen
                    for i, (c, b, mk, fc, ws) in enumerate(aceptadas)]
 
     return ResultadoSegmentacion(img, escala, etapas, detecciones, rechazadas)
+
+
+def _medir_region(c: np.ndarray, distintiva: np.ndarray) -> tuple:
+    """Métricas de forma, máscara local (bbox) y fracción de color distintivo."""
+    mr = metricas_contorno(c)
+    rx, ry, rw, rh = mr["bbox"]
+    mask_r = np.zeros((rh, rw), np.uint8)
+    cv2.drawContours(mask_r, [_desplazar(c, -rx, -ry)], -1, 255, cv2.FILLED)
+    n_px = max(cv2.countNonZero(mask_r), 1)
+    frac = cv2.countNonZero(cv2.bitwise_and(distintiva[ry:ry + rh, rx:rx + rw], mask_r)) / n_px
+    return mr, mask_r, frac
 
 
 def _desplazar(c: np.ndarray, dx: int, dy: int) -> np.ndarray:
@@ -345,8 +369,23 @@ def cerrar_componente(c: np.ndarray, kernel: np.ndarray, forma: tuple) -> np.nda
         _desplazar(max(cs, key=cv2.contourArea), x - m, y - m), forma)
 
 
-def _dividir_candidatos(contornos, img, p, area_min, area_max, rechazadas):
-    """Aplica watershed a los candidatos poco sólidos. Devuelve [(contorno, dividida)]."""
+def _todas_redondas(regiones: list[np.ndarray], umbral: float) -> bool:
+    if len(regiones) < 2:
+        return False
+    for r in regiones:
+        cs, _ = cv2.findContours(r, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        if not cs or redondez(cv2.convexHull(max(cs, key=cv2.contourArea))) < umbral:
+            return False
+    return True
+
+
+def _dividir_candidatos(contornos, img, p, area_min, area_max, rechazadas,
+                        distintivos=False):
+    """Aplica watershed a los candidatos poco sólidos. Devuelve [(contorno, dividida)].
+
+    En candidatos ``distintivos`` con envolvente muy circular se asume un solo
+    fruto tapado (tallos, sépalos) y no se divide.
+    """
     salida = []
     for c in contornos:
         m = metricas_contorno(c)
@@ -363,6 +402,13 @@ def _dividir_candidatos(contornos, img, p, area_min, area_max, rechazadas):
         cv2.drawContours(local, [_desplazar(c, -x, -y)], -1, 255, cv2.FILLED)
         regiones = separar_watershed(local, img[y:y + h, x:x + w],
                                      p.umbral_dist_watershed, p.ventana_picos_frac)
+        # Varios frutos en corro también dan una envolvente redonda: un fruto tapado
+        # se parte en cuñas, un racimo en regiones que son redondas por sí solas.
+        if distintivos and p.redondez_envolvente_unico > 0 and \
+                redondez(cv2.convexHull(c)) >= p.redondez_envolvente_unico and \
+                not _todas_redondas(regiones, p.redondez_envolvente_unico):
+            salida.append((c, False))
+            continue
         dividida = len(regiones) > 1
         for r in regiones:
             cs, _ = cv2.findContours(r, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)

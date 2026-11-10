@@ -1,8 +1,8 @@
 ﻿etapa,tiempo_ms
-1. carga,41.771499993046746
-1. redimensionado,24.044099991442636
-2. preprocesamiento,321.1486999935005
-3. segmentación + watershed + validación,301.12259997986257
-4. características,244.0385000081733
-4. clasificación por reglas,3.809899993939325
-TOTAL,935.935299959965
+1. carga,49.2065999424085
+1. redimensionado,26.506899972446263
+2. preprocesamiento,179.9726999597624
+3. segmentación + watershed + validación,137.90179998613894
+4. características,149.13500007241964
+4. clasificación por reglas,3.439099993556738
+TOTAL,546.1620999267325

@@ -181,8 +181,10 @@ class CalibracionCamara:
 
     def resumen(self) -> str:
         fx, fy, cx, cy = self.K[0, 0], self.K[1, 1], self.K[0, 2], self.K[1, 2]
-        return (f"Imagen {self.tam_imagen[0]}x{self.tam_imagen[1]} | vistas: {len(self.vistas)} | "
-                f"RMS = {self.rms:.3f} px\n  fx={fx:.1f} fy={fy:.1f} cx={cx:.1f} cy={cy:.1f}\n"
+        origen = (f"calibración {self.vistas[0]}" if np.isnan(self.rms)
+                  else f"vistas: {len(self.vistas)} | RMS = {self.rms:.3f} px")
+        return (f"Imagen {self.tam_imagen[0]}x{self.tam_imagen[1]} | {origen}\n"
+                f"  fx={fx:.1f} fy={fy:.1f} cx={cx:.1f} cy={cy:.1f}\n"
                 f"  distorsión = {np.round(self.dist.ravel(), 4)}")
 
 
@@ -237,6 +239,32 @@ def calibracion_aproximada(tam: tuple, f35_mm: float) -> CalibracionCamara:
     K = np.array([[f, 0, (ancho - 1) / 2], [0, f, (alto - 1) / 2], [0, 0, 1]], np.float64)
     return CalibracionCamara(K, np.zeros((1, 5)), (int(ancho), int(alto)), float("nan"),
                              [], [f"aproximada (f35 = {f35_mm:g} mm)"])
+
+
+def fov_horizontal_desde_f35(f35_mm: float, aspecto_sensor: float = 4 / 3) -> float:
+    """Campo de visión horizontal (grados) del lente cuya focal equivalente es f35.
+
+    La equivalencia se define sobre la diagonal (43.27 mm), repartida según la
+    relación de aspecto del sensor (4:3 en casi todos los celulares). El video
+    16:9 recorta arriba y abajo, así que conserva este ángulo horizontal.
+    """
+    ancho_equiv = DIAGONAL_35MM * aspecto_sensor / np.hypot(aspecto_sensor, 1.0)
+    return float(np.degrees(2 * np.arctan(ancho_equiv / (2 * f35_mm))))
+
+
+def calibracion_por_fov(tam: tuple, fov_grados: float, eje: str = "horizontal") -> CalibracionCamara:
+    """K aproximada SIN tablero a partir del campo de visión de la cámara.
+
+    f_px = (lado_px / 2) / tan(FOV / 2), con ``eje`` = "horizontal", "vertical" o
+    "diagonal" según cómo lo indique la ficha técnica. Mismos supuestos que
+    calibracion_aproximada(): píxeles cuadrados, centro en el medio, sin distorsión.
+    """
+    ancho, alto = tam
+    lado = {"horizontal": ancho, "vertical": alto, "diagonal": float(np.hypot(ancho, alto))}[eje]
+    f = lado / 2 / np.tan(np.radians(fov_grados) / 2)
+    K = np.array([[f, 0, (ancho - 1) / 2], [0, f, (alto - 1) / 2], [0, 0, 1]], np.float64)
+    return CalibracionCamara(K, np.zeros((1, 5)), (int(ancho), int(alto)), float("nan"),
+                             [], [f"aproximada (FOV {eje} = {fov_grados:g}°)"])
 
 
 def calibrar_desde_puntos(obj_pts: list, img_pts: list, tam: tuple,
@@ -417,24 +445,30 @@ def emparejar_caracteristicas(img_izq, img_der, max_pts: int = 4000, ratio: floa
     return pi, pd_
 
 
-def pose_por_esencial(img_izq, img_der, cal: CalibracionCamara,
-                      linea_base_mm: float) -> tuple[CalibracionEstereo, dict]:
+def pose_por_esencial(img_izq, img_der, cal: CalibracionCamara, linea_base_mm: float,
+                      cal_der: CalibracionCamara | None = None) -> tuple[CalibracionEstereo, dict]:
     """Pose relativa con la matriz esencial (K conocida) + línea base MEDIDA.
 
     La matriz esencial solo da la dirección de la traslación (escala
-    desconocida). La escala métrica se obtiene de la distancia que se desplazó
-    el celular, medida con una regla. Un error en esa medida produce un error
-    proporcional en la profundidad.
+    desconocida). La escala métrica se obtiene de la separación entre las dos
+    posiciones de cámara, medida con una regla. Un error en esa medida produce
+    un error proporcional en la profundidad.
+
+    ``cal_der``: intrínsecos de la cámara derecha cuando es OTRA cámara (Modo 3);
+    si es None se usa ``cal`` para ambas vistas (Modo 2, un solo celular).
     """
+    cal_d = cal_der or cal
+    if cal_d.tam_imagen != cal.tam_imagen:
+        raise ValueError(f"Tamaños distintos: {cal.tam_imagen} vs {cal_d.tam_imagen}. Use armonizar().")
     pi, pd_ = emparejar_caracteristicas(img_izq, img_der)
     if len(pi) < 15:
         raise RuntimeError(f"Muy pocas correspondencias ({len(pi)}).")
     ni = cv2.undistortPoints(pi.reshape(-1, 1, 2), cal.K, cal.dist)
-    nd = cv2.undistortPoints(pd_.reshape(-1, 1, 2), cal.K, cal.dist)
+    nd = cv2.undistortPoints(pd_.reshape(-1, 1, 2), cal_d.K, cal_d.dist)
     # RANSAC descarta los emparejamientos malos; LMEDS refina con los buenos. Solo
     # con RANSAC la rotación variaba hasta ~0.5°, y medio grado mueve la
     # profundidad ~20 % con una línea base de 6 cm.
-    umbral = 1.0 / cal.K[0, 0]                       # 1 px en coordenadas normalizadas
+    umbral = 2.0 / (cal.K[0, 0] + cal_d.K[0, 0])     # 1 px en coordenadas normalizadas
     _, inl = cv2.findEssentialMat(ni, nd, np.eye(3), cv2.RANSAC, 0.999, umbral)
     buenos = inl.ravel() > 0
     ni, nd = ni[buenos], nd[buenos]
@@ -442,7 +476,7 @@ def pose_por_esencial(img_izq, img_der, cal: CalibracionCamara,
     _, R, t, inl_pose = cv2.recoverPose(E, ni, nd, np.eye(3), mask=inl)
     T = t / np.linalg.norm(t) * linea_base_mm
     info = {"correspondencias": len(pi), "inliers": int((inl_pose > 0).sum())}
-    return CalibracionEstereo(cal.K, cal.dist, cal.K, cal.dist, R, T, cal.tam_imagen,
+    return CalibracionEstereo(cal.K, cal.dist, cal_d.K, cal_d.dist, R, T, cal.tam_imagen,
                               None, "matriz esencial + línea base medida", E), info
 
 
@@ -556,6 +590,26 @@ def nube_3d(disp: np.ndarray, Q: np.ndarray) -> np.ndarray:
     pts[~np.isfinite(disp)] = np.nan
     pts[np.abs(pts[..., 2]) > 1e5] = np.nan
     return pts
+
+
+def medir_por_altura(df: pd.DataFrame, altura_mm: float, f_px: float) -> pd.DataFrame:
+    """Dimensiones con UNA foto cenital y la altura del lente sobre la superficie.
+
+    Pinhole con frutos apoyados: el contorno aparente está a media altura del
+    fruto, Z = H - D/2. Con D = d_px·Z/f queda D = d_px·H / (f + d_px/2).
+    """
+    d_px = df["diametro_equiv_px_orig"].to_numpy(float)
+    diametro = d_px * altura_mm / (f_px + d_px / 2)
+    z = altura_mm - diametro / 2
+    relativo = d_px / np.median(d_px)
+    return pd.DataFrame({
+        "id": df["id"].to_numpy(),
+        "tamano_relativo": np.select([relativo < 0.9, relativo > 1.1], ["Pequeño", "Grande"], "Mediano"),
+        "profundidad_mm": z,
+        "ancho_mm": df["ancho_bbox_px_orig"].to_numpy(float) * z / f_px,
+        "alto_mm": df["alto_bbox_px_orig"].to_numpy(float) * z / f_px,
+        "diametro_equiv_mm": diametro,
+    })
 
 
 def medir_tomates(df: pd.DataFrame, detecciones: list, escala: float,

@@ -69,6 +69,14 @@ def _rangos_hsv(colores: dict) -> dict:
             for nombre, rangos in colores.items()}
 
 
+# Celular por DroidCam (IP y puerto que muestra la app) y su focal equivalente a 35 mm.
+ORIGEN_CELULAR = "http://192.168.1.2:4747/video"
+F35_CELULAR = 26     # iPhone 15, cámara principal (1x)
+# Altura del lente sobre la mesa, deducida de un tomate de 5.5 cm medido con regla
+# (foto_20261108_140128). Solo vale con el celular a esa altura y mirando hacia abajo.
+ALTURA_CELULAR_CM = 27.45
+
+
 # ---------------------------------------------------------------------------
 # Parámetros de segmentación y detección
 # ---------------------------------------------------------------------------
@@ -126,6 +134,16 @@ class ParametrosSegmentacion:
     # Dos frutos cuyos centros estén más cerca que esta ventana dan una sola
     # semilla y NO se separan, así que un valor alto fusiona racimos.
     ventana_picos_frac: float = 0.6
+
+    # Oclusión (frutos convexos, p. ej. tomate). Un tallo o un fruto vecino le
+    # "muerde" la silueta al fruto; su envolvente convexa (cv2.convexHull)
+    # recupera la forma completa. Solo para candidatos de color distintivo.
+    usar_envolvente: bool = False
+    # Redondez de la envolvente = su área / área del círculo mínimo que la
+    # encierra (cv2.minEnclosingCircle). Si una región poco sólida tiene una
+    # envolvente así de redonda es UN fruto tapado (no varios pegados: dos
+    # círculos que se tocan dan ~0.55) y no se divide con watershed. 0 = nunca.
+    redondez_envolvente_unico: float = 0.0
 
     # La parte verde y la distintiva de un fruto a medio madurar solo se unen
     # si la unión es más circular que la parte distintiva sola. Desactivar en
