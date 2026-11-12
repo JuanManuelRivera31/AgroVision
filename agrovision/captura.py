@@ -77,35 +77,89 @@ def _es_windows() -> bool:
     return os.name == "nt"
 
 
+TECLAS_SALIR = (ord("q"), 27)            # q o ESC
+TECLAS_GUARDAR = (ord("g"), 13)           # g o ENTER: guardar la foto tomada
+TECLAS_REPETIR = (ord("r"),)              # r: descartarla y volver a la cámara
+
+
+def texto_ascii(texto: str) -> str:
+    """cv2.putText no dibuja tildes ni eñes."""
+    import unicodedata
+    return unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+
+
+def franja_texto(img: np.ndarray, *lineas: str, alto_linea: int = 30) -> np.ndarray:
+    """Agrega arriba de la imagen una franja negra con las líneas de texto."""
+    franja = np.zeros((alto_linea * len(lineas) + 12, img.shape[1], 3), np.uint8)
+    for i, t in enumerate(lineas):
+        cv2.putText(franja, texto_ascii(t), (12, alto_linea * (i + 1)), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7, (255, 255, 255), 2, cv2.LINE_AA)
+    return np.vstack([franja, img])
+
+
 def capturar_foto(fuente: FuenteCamara, ventana: str = "AgroVision - ESPACIO: tomar foto, q: salir",
-                  ancho_vista: int = 1000):
+                  ancho_vista: int = 1000, aviso: str = ""):
     """Vista en vivo hasta pulsar ESPACIO (devuelve el fotograma) o q/ESC (devuelve None)."""
     cv2.namedWindow(ventana, cv2.WINDOW_AUTOSIZE)
     cv2.setWindowProperty(ventana, cv2.WND_PROP_TOPMOST, 1)
     while True:
         frame, _ = fuente.ultimo()
         f = ancho_vista / frame.shape[1]
-        cv2.imshow(ventana, cv2.resize(frame, None, fx=f, fy=f))
+        vista = cv2.resize(frame, None, fx=f, fy=f)
+        if aviso:
+            vista = franja_texto(vista, aviso)
+        cv2.imshow(ventana, vista)
         k = cv2.waitKey(30) & 0xFF
         if k == 32:
             return frame
-        if k in (ord("q"), 27):
+        if k in TECLAS_SALIR:
             return None
 
 
-def guardar_foto(frame: np.ndarray, carpeta: Path) -> Path:
-    ruta = carpeta / datetime.now().strftime("foto_%Y%m%d_%H%M%S.png")
+def confirmar_foto(frame: np.ndarray, ventana: str, ancho_vista: int = 1000) -> bool | None:
+    """Muestra la foto tomada. True = guardar (g/ENTER), False = repetir (r), None = cancelar (q/ESC)."""
+    f = ancho_vista / frame.shape[1]
+    vista = franja_texto(cv2.resize(frame, None, fx=f, fy=f),
+                         "g / ENTER: guardar foto     r: repetir foto     q: cancelar")
+    while True:
+        cv2.imshow(ventana, vista)
+        k = cv2.waitKey(0) & 0xFF
+        if k in TECLAS_GUARDAR:
+            return True
+        if k in TECLAS_REPETIR:
+            return False
+        if k in TECLAS_SALIR:
+            return None
+
+
+def guardar_foto(frame: np.ndarray, carpeta: Path, fruta: str | None = None) -> Path:
+    """Guarda ``foto_AAAAMMDD_HHMMSS[_fruta].png``."""
+    nombre = datetime.now().strftime("foto_%Y%m%d_%H%M%S") + (f"_{fruta}" if fruta else "")
+    ruta = carpeta / f"{nombre}.png"
     guardar_imagen(ruta, frame)
     return ruta
 
 
 def tomar_foto(origen: int | str, carpeta: Path) -> Path | None:
-    """Abre la cámara, espera ESPACIO y guarda la foto. None si se cancela con q."""
+    """Abre la cámara; ESPACIO toma la foto y se elige guardarla (g) o repetirla (r).
+
+    Solo se guarda cuando se confirma. None si se cancela con q. El análisis lo
+    hace después el notebook sobre la foto guardada.
+    """
     camara = FuenteCamara(origen, "celular", resolucion=(1280, 720))
     try:
         camara.ultimo(espera_max=8.0)
-        frame = capturar_foto(camara)
-        return guardar_foto(frame, carpeta) if frame is not None else None
+        ventana = "AgroVision - ESPACIO: tomar foto, q: cancelar"
+        while True:
+            frame = capturar_foto(camara, ventana,
+                                  aviso="Apunte a los frutos.  ESPACIO: tomar foto   q: cancelar")
+            if frame is None:
+                return None
+            decision = confirmar_foto(frame, ventana)
+            if decision is None:
+                return None
+            if decision:
+                return guardar_foto(frame, carpeta)
     finally:
         camara.cerrar()
         cv2.destroyAllWindows()

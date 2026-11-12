@@ -18,7 +18,11 @@
     "ventana_picos_frac": 1.2,
     "union_mas_circular": false,
     "area_min_rel": 0.5,
-    "kernel_cierre": 15
+    "kernel_cierre": 15,
+    "semillas_por_bordes": true,
+    "fusion_contacto": 0.3,
+    "bordes_suavizado": 5,
+    "semillas_apertura": 9
   },
   "madurez": {
     "colores": {

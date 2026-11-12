@@ -1,0 +1,9 @@
+﻿etapa,tiempo_ms
+1. carga,18.948200000068027
+1. reconocer fruta,1729.514300000119
+1. redimensionado,1.6126999998959946
+2. preprocesamiento,13.37790000025052
+3. segmentación + watershed + validación,105.1196000003074
+4. características,44.982599999912054
+4. clasificación por reglas,0.5604000002676912
+TOTAL,1914.1157000008207

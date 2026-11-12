@@ -1,0 +1,41 @@
+{
+  "nombre": "manzana",
+  "descripcion": "Manzana redonda (variedad roja/bicolor). Madurez por verde -> amarillo -> rojo. Ajustado con data/imagenes/manzanas.jpg.",
+  "segmentacion": {
+    "colores": {
+      "rojo": [[[0, 90, 60], [9, 255, 255]], [[160, 90, 60], [179, 255, 255]]],
+      "amarillo": [[[10, 70, 140], [30, 255, 255]]],
+      "verde": [[[31, 50, 60], [85, 255, 255]]]
+    },
+    "colores_follaje": ["verde"],
+    "aspecto_max": 2.0,
+    "circularidad_min": 0.5,
+    "solidez_min": 0.85,
+    "circularidad_min_verde": 0.6,
+    "solidez_min_verde": 0.88,
+    "ajuste_elipse_min_verde": 0.85,
+    "area_min_frac": 0.004,
+    "area_min_rel": 0.4,
+    "kernel_cierre": 15,
+    "usar_envolvente": true,
+    "redondez_envolvente_unico": 0.65,
+    "semillas_por_bordes": true,
+    "semillas_apertura": 21
+  },
+  "madurez": {
+    "colores": {
+      "rojo": [[[0, 0, 0], [9, 255, 255]], [[160, 0, 0], [179, 255, 255]]],
+      "amarillo": [[[10, 0, 0], [30, 255, 255]]],
+      "verde": [[[31, 0, 0], [85, 255, 255]]]
+    },
+    "s_min_valido": 40,
+    "v_min_valido": 40,
+    "etapas": [
+      {"nombre": "Verde", "color_bgr": [60, 200, 60], "minimos": {"verde": 0.5}, "maximos": {"rojo": 0.15}},
+      {"nombre": "Pintón", "color_bgr": [0, 210, 230]},
+      {"nombre": "Madura", "color_bgr": [40, 40, 220], "minimos": {"rojo": 0.5}, "maximos": {"verde": 0.15}}
+    ],
+    "por_defecto": "Pintón",
+    "ejes_grafico": ["verde", "rojo"]
+  }
+}

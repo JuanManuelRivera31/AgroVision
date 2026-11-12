@@ -1,0 +1,48 @@
+{
+  "nombre": "mango",
+  "descripcion": "Mango ovalado. Madurez por verde -> amarillo/naranja (con o sin chapa roja). Ajustado con data/imagenes/mangos.jpg.",
+  "segmentacion": {
+    "colores": {
+      "rojo": [[[0, 40, 110], [8, 255, 255]], [[165, 40, 110], [179, 255, 255]]],
+      "naranja": [[[9, 25, 110], [20, 255, 255]]],
+      "amarillo": [[[21, 25, 110], [32, 255, 255]]],
+      "verde": [[[33, 35, 80], [85, 255, 255]]]
+    },
+    "colores_follaje": ["verde"],
+    "aspecto_max": 2.4,
+    "circularidad_min": 0.4,
+    "solidez_min": 0.8,
+    "circularidad_min_verde": 0.6,
+    "solidez_min_verde": 0.9,
+    "ajuste_elipse_min_verde": 0.88,
+    "area_min_frac": 0.004,
+    "area_min_rel": 0.4,
+    "kernel_cierre": 21,
+    "ventana_picos_frac": 0.6,
+    "umbral_dist_watershed": 0.4,
+    "solidez_para_watershed": 0.92,
+    "usar_envolvente": false,
+    "redondez_envolvente_unico": 0.62,
+    "semillas_por_bordes": true,
+    "fusion_contacto": 0.5,
+    "semillas_apertura": 15,
+    "bordes_suavizado": 11
+  },
+  "madurez": {
+    "colores": {
+      "rojo": [[[0, 0, 0], [8, 255, 255]], [[165, 0, 0], [179, 255, 255]]],
+      "naranja": [[[9, 0, 0], [20, 255, 255]]],
+      "amarillo": [[[21, 0, 0], [32, 255, 255]]],
+      "verde": [[[33, 0, 0], [85, 255, 255]]]
+    },
+    "s_min_valido": 40,
+    "v_min_valido": 40,
+    "etapas": [
+      {"nombre": "Verde", "color_bgr": [60, 200, 60], "minimos": {"verde": 0.6}},
+      {"nombre": "Pintón", "color_bgr": [0, 220, 220]},
+      {"nombre": "Maduro", "color_bgr": [0, 140, 255], "maximos": {"verde": 0.1, "amarillo": 0.6}}
+    ],
+    "por_defecto": "Pintón",
+    "ejes_grafico": ["verde", "naranja"]
+  }
+}

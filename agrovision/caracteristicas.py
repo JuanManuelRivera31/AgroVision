@@ -60,6 +60,9 @@ def extraer_caracteristicas(res: ResultadoSegmentacion, reglas: ReglasMadurez) -
         cx = mom["m10"] / mom["m00"] if mom["m00"] else x + w / 2
         cy = mom["m01"] / mom["m00"] if mom["m00"] else y + h / 2
         diam_eq = np.sqrt(4 * m["area"] / np.pi)
+        # Largo y ancho reales (rectángulo rotado mínimo): el bbox de un fruto
+        # inclinado (banano, mango) sobrestima ambos.
+        (_, _), (l1, l2), _ = cv2.minAreaRect(d.contorno)
 
         fila = {
             "id": d.id,
@@ -74,6 +77,8 @@ def extraer_caracteristicas(res: ResultadoSegmentacion, reglas: ReglasMadurez) -
             "centroide_x": cx, "centroide_y": cy,
             "diametro_equiv_px": diam_eq,
             "diametro_equiv_px_orig": diam_eq / res.escala,
+            "largo_px_orig": max(l1, l2) / res.escala,
+            "grosor_px_orig": min(l1, l2) / res.escala,
             "ancho_bbox_px_orig": w / res.escala,
             "alto_bbox_px_orig": h / res.escala,
             "H_media": float(hsv_px[:, 0].mean()),

@@ -20,7 +20,7 @@ from agrovision.caracteristicas import extraer_caracteristicas  # noqa: E402
 from agrovision.clasificacion import aplicar_reglas  # noqa: E402
 from agrovision.config import ParametrosSGBM, PatronCalibracion, cargar_perfil  # noqa: E402
 from agrovision.evaluacion import iou, precision_recall  # noqa: E402
-from agrovision.procesamiento import cargar_imagen, guardar_imagen  # noqa: E402
+from agrovision.procesamiento import cargar_imagen, guardar_imagen, redimensionar  # noqa: E402
 from agrovision.segmentacion import segmentar  # noqa: E402
 import sinteticos as sin  # noqa: E402
 
@@ -462,3 +462,58 @@ def test_pose_por_esencial_estable_y_profundidad_sin_tablero():
     ri, rd = est.rectificar_par(izq, der, rect)
     z = est.nube_3d(est.calcular_disparidad(ri, rd), rect.Q)[..., 2]
     assert np.nanmedian(z) == pytest.approx(800, rel=0.06)
+
+
+def test_todos_los_perfiles_cargan():
+    from agrovision.config import listar_perfiles
+    frutas = listar_perfiles()
+    assert {"tomate", "banano", "mango", "manzana"} <= set(frutas)
+    for f in frutas:
+        assert cargar_perfil(f).madurez.categorias
+
+
+@pytest.mark.skipif(not (Path(__file__).resolve().parent.parent / "data" / "referencias_frutas.csv").is_file(),
+                    reason="sin fotos de referencia")
+def test_reconoce_la_fruta_de_las_fotos_de_referencia():
+    from agrovision import config as cfg
+    from agrovision import reconocimiento as rec
+    modelo, cols = rec.cargar_modelo()
+    for imagen, fruta in [("foto_20261111_231033.png", "mango"), ("foto_20261111_232530.png", "mango"),
+                          ("foto_20261111_232901.png", "tomate"), ("foto_20261111_225829_tomate.png", "tomate"),
+                          ("manzanas.jpg", "manzana"), ("bananos.jpeg", "banano")]:
+        ruta = cfg.DIR_IMAGENES / imagen
+        if ruta.is_file():
+            assert rec.reconocer_fruta(cargar_imagen(ruta), modelo, cols).fruta == fruta
+
+
+def test_semillas_por_bordes_separan_frutos_pegados():
+    # Dos "mangos" naranjas que se tocan, separados solo por una línea de sombra.
+    img = np.full((600, 900, 3), 40, np.uint8)
+    cv2.ellipse(img, (330, 300), (150, 110), 0, 0, 360, (0, 140, 255), cv2.FILLED)
+    cv2.ellipse(img, (590, 300), (150, 110), 0, 0, 360, (0, 140, 255), cv2.FILLED)
+    cv2.line(img, (460, 150), (460, 450), (0, 60, 110), 6)
+    p = cargar_perfil("mango", area_min_rel=0.0).segmentacion
+    assert segmentar(img, p).conteo == 2
+
+
+def test_mango_con_manchas_no_se_parte_en_trozos():
+    # Foto real de 3 mangos con manchas y zonas pálidas sobre fondo oscuro: antes salían 7.
+    from agrovision import config as cfg
+    for nombre in ["foto_20261111_231033.png", "foto_20261111_230955.png", "mango.jpeg"]:
+        ruta = cfg.DIR_IMAGENES / nombre
+        if not ruta.is_file():
+            continue
+        img, _ = redimensionar(cargar_imagen(ruta), 1280, ampliar=True)
+        assert segmentar(img, cargar_perfil("mango").segmentacion).conteo == 3, nombre
+
+
+def test_cuenta_5_tomates_en_la_charola_y_4_bananos_pegados():
+    from agrovision import config as cfg
+    casos = [("tomate", "foto_20261111_232901.png", 5), ("tomate", "foto_20261111_225829_tomate.png", 5),
+             ("banano", "bananos.jpeg", 4)]
+    for fruta, nombre, esperado in casos:
+        ruta = cfg.DIR_IMAGENES / nombre
+        if not ruta.is_file():
+            continue
+        img, _ = redimensionar(cargar_imagen(ruta), 1280, ampliar=True)
+        assert segmentar(img, cargar_perfil(fruta).segmentacion).conteo == esperado, nombre

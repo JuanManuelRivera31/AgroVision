@@ -609,6 +609,9 @@ def medir_por_altura(df: pd.DataFrame, altura_mm: float, f_px: float) -> pd.Data
         "ancho_mm": df["ancho_bbox_px_orig"].to_numpy(float) * z / f_px,
         "alto_mm": df["alto_bbox_px_orig"].to_numpy(float) * z / f_px,
         "diametro_equiv_mm": diametro,
+        # Largo y grosor del fruto (rectángulo rotado), con la misma corrección de altura.
+        "largo_mm": df["largo_px_orig"].to_numpy(float) * z / f_px if "largo_px_orig" in df else np.nan,
+        "grosor_mm": df["grosor_px_orig"].to_numpy(float) * z / f_px if "grosor_px_orig" in df else np.nan,
     })
 
 

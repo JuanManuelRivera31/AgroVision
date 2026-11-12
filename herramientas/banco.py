@@ -47,7 +47,7 @@ def evaluar(cambios: dict | None = None, fruta: str = "tomate", imagen: str = "t
     """Segmenta con el perfil (más los cambios dados) y mide contra las anotaciones."""
     p = cfg.cargar_perfil(fruta, **(cambios or {})).segmentacion
     ruta = cfg.DIR_IMAGENES / imagen
-    img, escala = proc.redimensionar(proc.cargar_imagen(ruta), p.lado_max)
+    img, escala = proc.redimensionar(proc.cargar_imagen(ruta), p.lado_max, ampliar=True)
     res = seg.segmentar(img, p)
     gt, cats = cajas_reales(imagen, escala)
     pred = [d.bbox for d in res.detecciones]

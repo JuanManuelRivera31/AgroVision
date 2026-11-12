@@ -1,14 +1,54 @@
 # AgroVisión — estado del proyecto (para el equipo)
 
-*Actualizado: 8 de noviembre de 2026. Entrega: martes 10 de noviembre. Lo más reciente va
+*Actualizado: 11 de noviembre de 2026. Lo más reciente va
 primero; debajo está la bitácora de cada sesión.*
+
+## 11 de noviembre (noche): mangos reales y flujo de la foto
+
+* **Mango con fotos reales de DroidCam:** el perfil exigía saturación ≥ 110 (ajustado con una foto de internet) y
+  los mangos del celular tienen S ≈ 77–124, así que salían 2 cajas partidas en vez de 3 mangos. Se aflojaron los
+  rangos de `perfiles/mango.json` (S ≥ 35–40, V ≥ 110–120; el fondo oscuro se descarta por brillo). Resultado en
+  `foto_20261111_225957_mango.png`: 3/3, F1 1.00. En `mangos.jpg` F1 0.77 (antes ~0.80).
+* **Reconocimiento:** esa foto salía "tomate". Se renombró a `_mango`, se agregó a `data/referencias_frutas.csv`
+  y a `data/anotaciones_cajas.csv`; el reconocedor se reentrena solo. Ojo: ahora esa foto está en el entrenamiento,
+  así que su acierto ya no es una validación; hacen falta más fotos de mango con otra luz.
+* **Flujo de la cámara:** se quitó "siguiente foto". ESPACIO toma la foto, se ve congelada y se elige `g`/ENTER
+  (guardar) o `r` (repetir); `q` cancela sin guardar. Solo al guardar sigue el notebook, que hace todo el análisis.
+  `herramientas/tomar_foto.py` ahora solo captura y guarda (comparte `captura.tomar_foto`).
+
+## 11 de noviembre: mango y manzana (pedido del profesor)
+
+* **Perfiles nuevos:** `perfiles/mango.json` (Verde / Pintón / Maduro) y
+  `perfiles/manzana.json` (Verde / Pintón / Madura), ajustados con `data/imagenes/mangos.jpg`
+  y `manzanas.jpg` (fotos de internet).
+* **Frutos pegados:** mangos y manzanas vienen apretados y la máscara de color los une en una
+  sola mancha. Nueva opción del perfil `semillas_por_bordes`: se quitan los bordes de Canny
+  (sobre la imagen muy suavizada) y cada trozo grande que queda es la semilla de un fruto;
+  watershed las hace crecer dentro de la mancha. Tomate y banano no la usan (no cambian).
+* **Medido** (IoU 0.5, cajas anotadas a mano, 4 versiones de la imagen con ruido/interpolación):
+  mango F1 0.80–0.83 (7 de 8 mangos, 0 falsos); manzana F1 0.69–0.78 (canasta de ~18;
+  un par de manzanas salen partidas en dos). Es UNA foto por fruta: es ajuste, no validación.
+* **Imágenes pequeñas:** el notebook ahora amplía a 1280 px las fotos más chicas
+  (`redimensionar(..., ampliar=True)`), igual que ya hacía `tomar_foto.py`.
+* **La fruta se reconoce sola** (`agrovision/reconocimiento.py`): la foto se segmenta con
+  el perfil de cada fruta, cada objeto se describe por color, forma y textura, y una SVM
+  (clases balanceadas) entrenada con `data/referencias_frutas.csv` dice a qué fruta se
+  parece; gana la fruta con más área. Validación dejando fuera cada foto (las de internet,
+  por mitades): 10 de 12 aciertos. Reconoce bien las 9 fotos de referencia. Tarda ~1 s; el
+  modelo se entrena solo la primera vez (`modelos/reconocedor_frutas.joblib`) y se
+  reentrena si cambian las referencias o los perfiles.
+  * **Para que reconozca mejor con el celular:** agregar al CSV una foto DroidCam de cada
+    fruta (`foto_...png,mango`). Hoy mango, manzana y banano solo tienen fotos de internet.
+* **Uso:** notebook → "Ejecutar todo", ESPACIO; para otra fruta, "Ejecutar todo" otra vez.
+  Una sola fruta: `FRUTA = "mango"`. Sin notebook: `herramientas/tomar_foto.py`
+  (tras el resultado `f` = siguiente foto, `q` = salir; `--fruta mango` la fija).
 
 ## Qué es
 
 Proyecto universitario en Python + OpenCV **clásico** (sin redes neuronales). Se toma una
 foto con el celular por DroidCam y el sistema detecta los frutos, los cuenta, clasifica su
 madurez y estima su tamaño. Sirve para cualquier fruta: lo que depende de la fruta está en
-`perfiles/<fruta>.json` (hoy hay `tomate` y `banano`). Todo está en español. El README
+`perfiles/<fruta>.json` (hoy hay `tomate`, `banano`, `mango` y `manzana`). Todo está en español. El README
 explica el método completo.
 
 ## Estado para la entrega
@@ -27,7 +67,7 @@ Primera vez, en Windows:
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
 .\.venv\Scripts\python -m ipykernel install --user --name agrovision --display-name "Python (AgroVision)"
-.\.venv\Scripts\python -m pytest -q                       # deben pasar 23
+.\.venv\Scripts\python -m pytest -q                       # deben pasar 26
 ```
 
 Cada vez que se use:
@@ -110,7 +150,7 @@ naranja, y el sistema no sabe que ahí no hay frutos.
 
 | Script | Para qué |
 |---|---|
-| `tomar_foto.py` | Foto por DroidCam y análisis inmediato, sin notebook |
+| `tomar_foto.py` | Foto por DroidCam: ESPACIO toma, `g` guarda / `r` repite. El análisis va en el notebook |
 | `probar_camara.py` | Prueba cámaras en vivo: resolución, FPS, desfase |
 | `banco.py` | Mide precisión/recall/F1 de un perfil contra `data/anotaciones_cajas.csv` |
 | `buscar_parametros.py` | Búsqueda aleatoria de parámetros de un perfil |
@@ -664,3 +704,39 @@ queda en conteo y clasificación, sin tamaño físico ni profundidad.
   resolución de trabajo invalida el ajuste.
 - Los tomates muy ocluidos (más de la mitad tapada) no se detectan, y eso es una
   limitación del enfoque por contorno, no un parámetro mal puesto.
+
+---
+
+## 2026-11-11 (noche) — mango con manchas y análisis automático
+
+- **Mango:** en fotos reales (fondo oscuro, 3 mangos con manchas) salían 7 trozos. Causa: las
+  semillas por bordes de Canny leían manchas/textura como bordes entre frutos. Ahora
+  `fusion_contacto` (perfil mango = 0.5) une los trozos que comparten una frontera larga
+  (mismo fruto) y deja separados los que solo se tocan por una cintura (frutos distintos), y
+  `_recrecer_nucleos` devuelve a cada fruto los trozos finos que antes se perdían. Colores del
+  mango con S/V mínimos más bajos (zonas pálidas). Resultado: 3/3 en las 4 fotos propias.
+- **Reconocimiento:** se agregaron 4 fotos a `data/referencias_frutas.csv` (3 de mango, 1 de
+  tomate). Validación dejando una foto afuera: tomate y mango (fotos propias) aciertan; banano,
+  manzana y el mango de internet tienen una sola foto, así que no se pueden validar: **más fotos
+  propias de cada fruta = mejor reconocimiento**.
+- **Flujo:** `tomar_foto.py` ahora, al guardar con ENTER, ejecuta AgroVision.ipynb solo
+  (TOMAR_FOTO=False, esa foto) y deja las salidas escritas en el archivo (`--sin-notebook` lo
+  evita). La celda 1.1 no abre la cámara si hay una foto de menos de 2 min.
+
+## 2026-11-11 (más tarde) — tomates, bananos, medida y resumen en terminal
+
+- **Tomates en charola (5 reales, salían 4):** 3 tomates pegados se fundían en 1 y el tomate
+  amarillo-rosado quedaba a medias. Perfil tomate: `semillas_por_bordes` + `fusion_contacto` 0.5 y
+  color `amarillo` en la segmentación. Ahora 5/5 y las demás fotos de tomate no cambian.
+- **Bananos pegados:** salía 1 bloque (área excesiva). Perfil banano: semillas por bordes
+  (suavizado 5, apertura 9) + `fusion_contacto` 0.3; la fusión no une dos alargados lado a lado
+  (`_sigue_alargado`). bananos.jpeg: 4/4 (el 4.º pierde un poco su punta).
+- **Manzana:** sin cambios (la fusión empeora el canasto apretado); en las fotos de tomate como
+  sustituto no sobrecuenta. Falta una foto real de manzanas en la alfombra para validar.
+- **Medida:** `largo_mm` y `grosor_mm` (rectángulo rotado) además del diámetro; y se corrigió la
+  focal: los píxeles medidos son los de la imagen de trabajo, no los de la foto original (daba
+  error en fotos que no eran de 1280 px de lado).
+- **Reconocimiento:** cada fruta se puntúa solo con objetos hallados por SU perfil que se le
+  parecen. El mango de internet (mangos.jpg) quedó 50/50 con manzana (foto apretada de internet).
+- **Resumen en la terminal:** `agrovision/resumen.py`; `tomar_foto.py` lo imprime al guardar y lo
+  guarda en `resultados/estadisticas/<foto>_resumen.txt`.

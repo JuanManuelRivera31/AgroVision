@@ -2,7 +2,7 @@
 
 **Sistema inteligente de detección, conteo, estimación de tamaño y clasificación de madurez de frutos mediante visión computacional estereoscópica.**
 
-Proyecto universitario en Python + OpenCV. Detecta frutos en fotografías, los cuenta, los clasifica por etapa de madurez y, con visión estéreo calibrada, estima su **profundidad** y su **tamaño físico**. Lo que depende de la fruta está en un **perfil** (`perfiles/<fruta>.json`); hoy hay dos: **tomate** (Verde / Pintón / Maduro) y **banano** (Verde / Pintón / Maduro / Sobremaduro).
+Proyecto universitario en Python + OpenCV. Detecta frutos en fotografías, los cuenta, los clasifica por etapa de madurez y, con visión estéreo calibrada, estima su **profundidad** y su **tamaño físico**. Lo que depende de la fruta está en un **perfil** (`perfiles/<fruta>.json`); hoy hay cuatro: **tomate** (Verde / Pintón / Maduro), **banano** (Verde / Pintón / Maduro / Sobremaduro), **mango** (Verde / Pintón / Maduro) y **manzana** (Verde / Pintón / Madura).
 
 ---
 
@@ -32,6 +32,8 @@ AgroVision/
 ├── README.md
 ├── perfiles/                 Un .json por fruta: colores, forma y etapas de madurez
 │   ├── tomate.json
+│   ├── mango.json
+│   ├── manzana.json
 │   └── banano.json
 ├── herramientas/             banco.py (mide P/R/F1), buscar_parametros.py (ajusta un perfil),
 │                             probar_camara.py y revisar_tablero.py (revisa fotos del tablero)
@@ -61,11 +63,11 @@ AgroVision/
 
 ### Modo 1 — Fotografía individual
 1. Copie la foto en `data/imagenes/`.
-2. En la Etapa 1 elija la fruta (`FRUTA = "tomate"` o `"banano"`) y, si hay varias fotos, `NOMBRE_IMAGEN`.
+2. En la Etapa 1 la fruta **se reconoce sola** (`agrovision/reconocimiento.py`, SVM entrenada con `data/referencias_frutas.csv`); para trabajar con una sola fruta se fija con `FRUTA = "mango"`.
 3. Ejecute el Notebook desde el inicio (Etapas 1 a 4 y 8).
 4. Si la detección no es buena, ajuste el perfil (ver abajo). Las figuras de la Etapa 3 muestran cada máscara y el motivo de cada rechazo para guiar el ajuste.
 
-**Foto directa con el celular (DroidCam):** con la app abierta y `TOMAR_FOTO = True`, "Ejecutar todo" en el notebook abre la cámara; con ESPACIO se toma la foto y todo el notebook se evalúa sobre ella. El tamaño es aproximado: cada fruto sale con su diámetro en cm y como Pequeño/Mediano/Grande frente a los demás de la foto. Los cm suponen el celular a la misma altura que en la referencia (`ALTURA_CELULAR_CM` en `agrovision/config.py`, deducida de un tomate de 5.5 cm). La IP está en `ORIGEN_CELULAR` (`agrovision/config.py`). Versión rápida sin notebook: `.\.venv\Scripts\python herramientas/tomar_foto.py`.
+**Foto directa con el celular (DroidCam):** `.\.venv\Scripts\python herramientas/tomar_foto.py` abre la cámara; ESPACIO toma la foto y `g`/ENTER la guarda (`r` repite). Al guardar, el sistema reconoce la fruta, cuenta, clasifica la madurez y mide, **imprime el resumen en la terminal** y escribe el análisis completo en `AgroVision.ipynb` sin tener que ejecutarlo (con `--sin-notebook` solo guarda la foto). El tamaño es aproximado: cm con el celular a la altura `ALTURA_CELULAR_CM` (`agrovision/config.py`, deducida de un tomate de 5.5 cm) y Pequeño/Mediano/Grande frente a los demás de la foto. La IP está en `ORIGEN_CELULAR`. También sirve "Ejecutar todo" en el notebook (abre la cámara si no hay una foto de menos de 2 min).
 
 ### Perfiles de fruta
 Un perfil tiene dos secciones:

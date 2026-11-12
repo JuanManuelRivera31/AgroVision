@@ -35,18 +35,21 @@ def guardar_imagen(ruta: str | Path, img: np.ndarray) -> Path:
     return ruta
 
 
-def redimensionar(img: np.ndarray, lado_max: int) -> tuple[np.ndarray, float]:
+def redimensionar(img: np.ndarray, lado_max: int, ampliar: bool = False) -> tuple[np.ndarray, float]:
     """Reescala para que el lado mayor sea ``lado_max``. Devuelve (imagen, escala).
 
     Las fotos de celular (12 MP o más) se reducen para que el procesamiento sea
-    rápido; los parámetros morfológicos están definidos a esta escala.
+    rápido; los parámetros morfológicos están definidos a esta escala. Con
+    ``ampliar`` las fotos más pequeñas (imágenes de internet) también se llevan
+    a ``lado_max``: si no, un kernel de 15 px es relativamente más grande y los
+    frutos vecinos se funden.
     """
     h, w = img.shape[:2]
     escala = lado_max / max(h, w)
-    if escala >= 1.0:
+    if abs(escala - 1.0) < 1e-6 or (escala > 1.0 and not ampliar):
         return img.copy(), 1.0
     nueva = cv2.resize(img, (round(w * escala), round(h * escala)),
-                       interpolation=cv2.INTER_AREA)
+                       interpolation=cv2.INTER_AREA if escala < 1 else cv2.INTER_CUBIC)
     return nueva, escala
 
 

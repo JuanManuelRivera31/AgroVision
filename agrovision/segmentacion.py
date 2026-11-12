@@ -262,9 +262,12 @@ def segmentar(img_bgr: np.ndarray, p: ParametrosSegmentacion) -> ResultadoSegmen
 
     # 5) Watershed sobre cada candidato poco sólido
     area_min, area_max = p.area_min_frac * area_img, p.area_max_frac * area_img
+    semillas = None
+    if p.semillas_por_bordes:
+        semillas, etapas["semillas"] = semillas_por_bordes(gris, distintiva, p, area_min)
     rechazadas: list[Rechazo] = []
     reg_distintivas = _dividir_candidatos(cand_distintivos, img, p, area_min, area_max,
-                                          rechazadas, distintivos=True)
+                                          rechazadas, distintivos=True, semillas=semillas)
     reg_verdes = _dividir_candidatos(cand_verdes, img, p, area_min, area_max, rechazadas)
 
     # 6) Frutos a medio madurar: la parte verde y la parte distintiva salen como
@@ -379,12 +382,122 @@ def _todas_redondas(regiones: list[np.ndarray], umbral: float) -> bool:
     return True
 
 
+def semillas_por_bordes(gris: np.ndarray, distintiva: np.ndarray,
+                        p: ParametrosSegmentacion, area_min: float) -> tuple:
+    """Una semilla por fruto: máscara distintiva menos los bordes de Canny.
+
+    Devuelve (etiquetas int32 con 0 = sin semilla, máscara binaria de semillas).
+    """
+    k = max(3, p.bordes_suavizado | 1)
+    suave = cv2.GaussianBlur(gris, (k, k), 0)
+    bordes = cv2.dilate(cv2.Canny(suave, *p.bordes_canny), kernel_eliptico(p.bordes_dilatacion))
+    s = cv2.bitwise_and(distintiva, cv2.bitwise_not(bordes))
+    s = cv2.morphologyEx(s, cv2.MORPH_OPEN, kernel_eliptico(p.semillas_apertura))
+    n, etiquetas, stats, _ = cv2.connectedComponentsWithStats(s)
+    pequenas = np.flatnonzero(stats[:, cv2.CC_STAT_AREA] < p.semillas_area_min * area_min)
+    etiquetas[np.isin(etiquetas, pequenas[pequenas > 0])] = 0
+    return etiquetas.astype(np.int32), ((etiquetas > 0) * 255).astype(np.uint8)
+
+
+def _crecer_semillas(local: np.ndarray, img_bgr: np.ndarray, semillas: np.ndarray) -> list:
+    """Watershed desde las semillas que caen dentro de la región ``local``."""
+    etiquetas = np.unique(semillas[local > 0])
+    etiquetas = etiquetas[etiquetas > 0]
+    if len(etiquetas) < 2:
+        return [local]
+    marcadores = np.zeros(local.shape, np.int32)
+    for i, e in enumerate(etiquetas, start=1):
+        marcadores[(semillas == e) & (local > 0)] = i
+    marcadores = cv2.watershed(img_bgr.copy(), marcadores)
+    regiones = [((marcadores == i) & (local > 0)).astype(np.uint8) * 255
+                for i in range(1, len(etiquetas) + 1)]
+    return [r for r in regiones if cv2.countNonZero(r)] or [local]
+
+
+def _solidez_aspecto(mascara: np.ndarray) -> tuple:
+    cs, _ = cv2.findContours(mascara, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    if not cs:
+        return 0.0, 99.0
+    m = metricas_contorno(max(cs, key=cv2.contourArea))
+    return m["solidez"], m["aspecto"]
+
+
+def _aspecto_rotado(mascara: np.ndarray) -> float:
+    pts = cv2.findNonZero(mascara)
+    if pts is None:
+        return 1.0
+    (_, _), (l1, l2), _ = cv2.minAreaRect(pts)
+    return max(l1, l2) / max(min(l1, l2), 1.0)
+
+
+def _sigue_alargado(a: np.ndarray, b: np.ndarray, union: np.ndarray) -> bool:
+    """Dos frutos alargados (bananos) pegados lado a lado dan una unión MÁS ancha y
+    menos alargada que cada uno; dos trozos de un mismo banano dan una unión más larga.
+    Los trozos pequeños (astillas) siempre se unen al vecino."""
+    area_a, area_b = cv2.countNonZero(a), cv2.countNonZero(b)
+    if min(area_a, area_b) < 0.25 * max(area_a, area_b):
+        return True
+    mayor = max(_aspecto_rotado(a), _aspecto_rotado(b))
+    return mayor < 2.5 or _aspecto_rotado(union) >= 0.85 * mayor
+
+
+def _fusionar_fragmentos(regiones: list, p: ParametrosSegmentacion) -> list:
+    """Vuelve a unir los trozos de un mismo fruto que las semillas de bordes partieron.
+
+    Una fruta con manchas, brillos o textura tiene bordes internos y sale en
+    varios trozos. Lo que distingue un trozo de un fruto vecino es el contacto:
+    dos trozos del mismo fruto comparten una frontera tan larga como el trozo
+    más pequeño es ancho; dos frutos pegados se tocan solo por una "cintura"
+    estrecha. Se unen los vecinos cuya frontera mida al menos ``fusion_contacto``
+    veces el diámetro equivalente del menor, siempre que la unión siga teniendo
+    forma de fruto (``aspecto_max``).
+    """
+    regiones = list(regiones)
+    k = np.ones((3, 3), np.uint8)
+    while len(regiones) > 1:
+        mejor = None
+        for i in range(len(regiones)):
+            for j in range(i + 1, len(regiones)):
+                frontera = cv2.countNonZero(cv2.bitwise_and(cv2.dilate(regiones[i], k), regiones[j]))
+                if frontera == 0:
+                    continue                                   # no son vecinos
+                menor = min(cv2.countNonZero(regiones[i]), cv2.countNonZero(regiones[j]))
+                contacto = frontera / max(np.sqrt(4 * menor / np.pi), 1.0)
+                if contacto >= p.fusion_contacto and (mejor is None or contacto > mejor[0]):
+                    union = cv2.bitwise_or(regiones[i], regiones[j])
+                    if _solidez_aspecto(union)[1] <= p.aspecto_max and                             _sigue_alargado(regiones[i], regiones[j], union):
+                        mejor = (contacto, i, j, union)
+        if mejor is None:
+            break
+        _, i, j, union = mejor
+        regiones = [r for n, r in enumerate(regiones) if n not in (i, j)] + [union]
+    return regiones
+
+
+def _recrecer_nucleos(local: np.ndarray, img_bgr: np.ndarray, regiones: list,
+                      kernel: np.ndarray) -> list:
+    """Quita las colas finas de cada trozo (apertura) y deja que el núcleo crezca de
+    nuevo por todo el candidato: así un trozo estrecho de un fruto no se pierde."""
+    nucleos = [cv2.morphologyEx(r, cv2.MORPH_OPEN, kernel) for r in regiones]
+    nucleos = [n for n in nucleos if cv2.countNonZero(n)]
+    if len(nucleos) < 2:
+        return nucleos or regiones
+    marcadores = np.zeros(local.shape, np.int32)
+    for i, n in enumerate(nucleos, start=1):
+        marcadores[n > 0] = i
+    marcadores = cv2.watershed(img_bgr.copy(), marcadores)
+    crecidos = [((marcadores == i) & (local > 0)).astype(np.uint8) * 255
+                for i in range(1, len(nucleos) + 1)]
+    return [r for r in crecidos if cv2.countNonZero(r)]
+
+
 def _dividir_candidatos(contornos, img, p, area_min, area_max, rechazadas,
-                        distintivos=False):
+                        distintivos=False, semillas=None):
     """Aplica watershed a los candidatos poco sólidos. Devuelve [(contorno, dividida)].
 
     En candidatos ``distintivos`` con envolvente muy circular se asume un solo
-    fruto tapado (tallos, sépalos) y no se divide.
+    fruto tapado (tallos, sépalos) y no se divide. Si hay ``semillas`` (ver
+    ``semillas_por_bordes``) y caen dos o más en un candidato, se divide con ellas.
     """
     salida = []
     for c in contornos:
@@ -395,6 +508,25 @@ def _dividir_candidatos(contornos, img, p, area_min, area_max, rechazadas,
             rechazadas.append(Rechazo(c, m["bbox"], "área excesiva (fondo/follaje)"))
             continue
         x, y, w, h = m["bbox"]
+        if semillas is not None:
+            local = np.zeros((h, w), np.uint8)
+            cv2.drawContours(local, [_desplazar(c, -x, -y)], -1, 255, cv2.FILLED)
+            regiones = _crecer_semillas(local, img[y:y + h, x:x + w], semillas[y:y + h, x:x + w])
+            if len(regiones) > 1 and p.fusion_contacto > 0:
+                regiones = _fusionar_fragmentos(regiones, p)
+            if len(regiones) > 1:
+                # Watershed deja colas finas (franjas de un fruto vecino que no
+                # tenía semilla propia): una apertura las corta.
+                k = kernel_eliptico(2 * p.semillas_apertura + 1)
+                if p.fusion_contacto > 0:
+                    regiones = _recrecer_nucleos(local, img[y:y + h, x:x + w], regiones, k)
+                for r in regiones:
+                    if p.fusion_contacto <= 0:
+                        r = cv2.morphologyEx(r, cv2.MORPH_OPEN, k)
+                    cs, _ = cv2.findContours(r, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                    if cs:
+                        salida.append((_desplazar(max(cs, key=cv2.contourArea), x, y), True))
+                continue
         if not (p.usar_watershed and m["solidez"] < p.solidez_para_watershed):
             salida.append((c, False))
             continue

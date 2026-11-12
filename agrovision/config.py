@@ -135,6 +135,11 @@ class ParametrosSegmentacion:
     # semilla y NO se separan, así que un valor alto fusiona racimos.
     ventana_picos_frac: float = 0.6
 
+    # Fusión de trozos: tras partir un candidato con semillas de bordes, dos trozos
+    # vecinos se vuelven a unir si su frontera común mide al menos esta fracción del
+    # diámetro del menor (son partes de un mismo fruto con manchas). 0 = desactivado.
+    fusion_contacto: float = 0.0
+
     # Oclusión (frutos convexos, p. ej. tomate). Un tallo o un fruto vecino le
     # "muerde" la silueta al fruto; su envolvente convexa (cv2.convexHull)
     # recupera la forma completa. Solo para candidatos de color distintivo.
@@ -150,9 +155,23 @@ class ParametrosSegmentacion:
     # frutos alargados (banano): unir sus dos mitades alarga la forma.
     union_mas_circular: bool = True
 
+    # Frutos del mismo color apretados unos contra otros (mango, manzana): la
+    # máscara de color los une en una sola mancha y la transformada de distancia
+    # no basta para separarlos. Lo que sí los separa es la línea de sombra entre
+    # ellos: se quitan los bordes de Canny (sobre la imagen muy suavizada, para
+    # ignorar las pecas de la cáscara) y cada trozo grande que queda es la
+    # SEMILLA de un fruto. Watershed hace crecer las semillas dentro de la mancha.
+    semillas_por_bordes: bool = False
+    bordes_suavizado: int = 15          # lado del gaussiano previo a Canny (px)
+    bordes_canny: tuple = (15, 40)      # umbrales de histéresis
+    bordes_dilatacion: int = 7          # grosor de la línea de corte (px)
+    semillas_apertura: int = 11         # apertura que separa semillas unidas por un hilo
+    semillas_area_min: float = 0.5      # área mínima de una semilla, fracción de area_min
+
     def __post_init__(self):
         self.colores = _rangos_hsv(self.colores)
         self.colores_follaje = tuple(self.colores_follaje)
+        self.bordes_canny = tuple(self.bordes_canny)
         desconocidos = set(self.colores_follaje) - set(self.colores)
         if desconocidos:
             raise ValueError(f"colores_follaje {sorted(desconocidos)} no están en colores")
