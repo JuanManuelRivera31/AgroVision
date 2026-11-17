@@ -1,0 +1,17 @@
+================================================================
+  AGROVISION - RESULTADO   (mango.jpeg)
+================================================================
+Fruta           : MANGO (reconocida sola)
+Parecido        : mango 100%
+Frutos contados : 3
+Madurez         : Verde 0   Pintón 3   Maduro 0
+Diámetro medio  : 8.2 cm   (mínimo 8.0, máximo 8.4)
+
+ #  Madurez     Largo x ancho (cm)  Diám. (cm)  Tamaño
+------------------------------------------------------
+ 1  Pintón         8.9 x 7.9        8.4       Mediano
+ 2  Pintón         8.9 x 7.5        8.2       Mediano
+ 3  Pintón         9.6 x 6.2        8.0       Mediano
+
+Tiempo de análisis: 3.2 s
+================================================================

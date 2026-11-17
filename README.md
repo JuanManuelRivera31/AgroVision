@@ -6,6 +6,8 @@ Proyecto universitario en Python + OpenCV. Detecta frutos en fotografías, los c
 
 ---
 
+> **Para revisar el proyecto rápido:** vea [INSTALACION_Y_USO.md](INSTALACION_Y_USO.md) (instalar con doble clic en `INSTALAR.bat`, ejecutar con `EJECUTAR.bat`, y cómo configurar DroidCam en `celular.txt`). Los resultados ya ejecutados están en `AgroVision_resultados.html`.
+
 ## 1. Instalación (Windows + VS Code)
 
 ```powershell

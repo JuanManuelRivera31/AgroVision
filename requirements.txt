@@ -1,14 +1,20 @@
-# AgroVisión - dependencias (Python 3.10+)
-opencv-python>=4.9
-numpy>=1.26
-matplotlib>=3.8
-pandas>=2.1
-scikit-learn>=1.4
-Pillow>=10       # leer el EXIF (focal equivalente) de las fotos del celular
+# AgroVisión - dependencias (probado con Python 3.12.10 en Windows 11)
+# Versiones FIJAS: son las mismas con las que se entrenó y probó el sistema.
+# (modelos/reconocedor_frutas.joblib se guardó con scikit-learn 1.9.1)
+opencv-python==5.0.0.93
+numpy==2.5.4
+matplotlib==3.11.2
+pandas==3.1.0
+scikit-learn==1.9.1
+joblib==1.6.0
+scipy==1.18.1
+Pillow==13.0.0
 # Entorno Jupyter (VS Code usa ipykernel)
-ipykernel>=6.29
-notebook>=7.0
-nbformat>=5.9
-nbclient>=0.10
+ipykernel==7.4.0
+notebook==7.6.4
+nbformat==5.11.1
+nbclient==0.11.0
+nbconvert==7.17.2
+jupyter_client==8.10.0
 # Pruebas automáticas
-pytest>=8
+pytest==9.2.0

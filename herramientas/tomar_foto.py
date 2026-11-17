@@ -53,12 +53,29 @@ def analizar_en_notebook(nombre_foto: str, notebook: Path | None = None) -> Path
     return notebook
 
 
+def _mostrar(imagen, nombre: str) -> None:
+    """Ventana con los frutos separados y medidos; se cierra con cualquier tecla."""
+    import cv2
+    ventana = "AgroVision - resultado (cualquier tecla para cerrar)"
+    f = 1100 / imagen.shape[1]
+    cv2.imshow(ventana, cv2.resize(imagen, None, fx=f, fy=f))
+    cv2.setWindowProperty(ventana, cv2.WND_PROP_TOPMOST, 1)
+    print(f"Imagen del resultado: resultados/detecciones/{nombre} (cierre la ventana para seguir)")
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Foto con DroidCam (guardar o repetir) y análisis en el notebook")
+    ap.add_argument("--solo-notebook", metavar="FOTO", help=argparse.SUPPRESS)   # uso interno
     ap.add_argument("--sin-notebook", action="store_true", help="solo guardar la foto, sin analizarla")
     ap.add_argument("origen", nargs="?", default=cfg.ORIGEN_CELULAR, help="índice de cámara o URL")
     a = ap.parse_args()
-    origen = int(a.origen) if a.origen.isdigit() else a.origen
+    if a.solo_notebook:                                 # proceso hijo: solo ejecuta el notebook
+        analizar_en_notebook(a.solo_notebook)
+        return 0
+    origen = cfg.normalizar_origen(a.origen)           # acepta IP suelta, URL o índice
 
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")
@@ -68,7 +85,7 @@ def main() -> int:
     except (RuntimeError, TimeoutError) as e:
         print(f"No llega imagen del celular: {e}")
         print("Con la app DroidCam abierta, use una de estas dos opciones:")
-        print("  1) Si la IP de la app cambió, pásela: herramientas/tomar_foto.py http://IP_DEL_CELULAR:4747/video")
+        print("  1) Si la IP de la app cambió, escríbala en celular.txt (o pásela: herramientas/tomar_foto.py 192.168.1.5)")
         print("  2) Con DroidCam Client en el PC (Start): herramientas/tomar_foto.py 1")
         return 1
     if ruta is None:
@@ -78,22 +95,27 @@ def main() -> int:
     if a.sin_notebook:
         print("Ahora ejecute el notebook (TOMAR_FOTO = False para no abrir la cámara otra vez).")
         return 0
-    print("Analizando la foto...")
+    # El notebook se ejecuta en otro proceso, al mismo tiempo que se calcula y se muestra el
+    # resumen: cuando se cierra la ventana del resultado, el notebook ya suele estar listo.
+    import subprocess
+    nb_proc = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--solo-notebook", ruta.name],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print("Analizando la foto (el notebook se escribe en paralelo)...")
     try:                                                # resumen en la terminal (mismas funciones del notebook)
         from agrovision import resumen
         analisis = resumen.analizar_foto(ruta)
         print(resumen.texto_resumen(analisis))
         resumen.guardar_resumen(analisis)
+        _mostrar(resumen.imagen_resultado(analisis), resumen.guardar_imagen_resultado(analisis).name)
     except Exception as e:                              # noqa: BLE001
         print(f"No se pudo calcular el resumen ({type(e).__name__}: {e}).")
-    print("Escribiendo el análisis completo en AgroVision.ipynb (unos segundos)...")
-    try:
-        nb = analizar_en_notebook(ruta.name)
-    except Exception as e:                              # noqa: BLE001 - se avisa y se sigue
-        print(f"No se pudo ejecutar el notebook solo ({type(e).__name__}: {e}).")
-        print("Ejecútelo a mano con TOMAR_FOTO = False.")
+    if nb_proc.poll() is None:
+        print("Terminando de escribir AgroVision.ipynb...")
+    if nb_proc.wait() != 0:
+        print("No se pudo ejecutar el notebook solo. Ejecútelo a mano con TOMAR_FOTO = False.")
         return 1
-    print(f"Listo: el análisis completo (gráficas) está en {nb.name} (si VS Code no lo recarga, ciérrelo y ábralo).")
+    print("Listo: el análisis completo (gráficas) ya está en AgroVision.ipynb "
+          "(si VS Code no lo recarga, ciérrelo y ábralo).")
     return 0
 
 

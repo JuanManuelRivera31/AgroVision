@@ -1,0 +1,18 @@
+================================================================
+  AGROVISION - RESULTADO   (bananos.jpeg)
+================================================================
+Fruta           : BANANO (reconocida sola)
+Parecido        : banano 100%
+Frutos contados : 4
+Madurez         : Verde 0   Pintón 0   Maduro 1   Sobremaduro 3
+Diámetro medio  : 9.4 cm   (mínimo 8.8, máximo 10.2)
+
+ #  Madurez     Largo x ancho (cm)  Diám. (cm)  Tamaño
+------------------------------------------------------
+ 1  Maduro        19.9 x 4.9        9.2       Mediano
+ 2  Sobremaduro   18.5 x 6.2        10.2      Mediano
+ 3  Sobremaduro   18.0 x 8.5        9.6       Mediano
+ 4  Sobremaduro   18.2 x 4.8        8.8       Mediano
+
+Tiempo de análisis: 30.0 s
+================================================================

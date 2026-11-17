@@ -10,6 +10,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+import cv2
+import numpy as np
 import pandas as pd
 
 from . import caracteristicas as car
@@ -19,6 +21,7 @@ from . import estereo as est
 from . import procesamiento as proc
 from . import reconocimiento as rec
 from . import segmentacion as seg
+from . import visualizacion as vis
 
 
 @dataclass
@@ -79,7 +82,6 @@ def texto_resumen(a: Analisis) -> str:
     if medido:
         d = t["diametro_equiv_mm"] / 10
         L.append(f"Diámetro medio  : {d.mean():.1f} cm   (mínimo {d.min():.1f}, máximo {d.max():.1f})")
-        L.append(f"Lente a         : {a.altura_cm:g} cm de la superficie (tamaños aproximados)")
     L.append("")
     cab = f"{'#':>2}  {'Madurez':<12}"
     if medido:
@@ -101,4 +103,26 @@ def guardar_resumen(a: Analisis) -> Path:
     cfg.DIR_RES_ESTADISTICAS.mkdir(parents=True, exist_ok=True)
     ruta = cfg.DIR_RES_ESTADISTICAS / f"{a.ruta.stem}_resumen.txt"
     ruta.write_text(texto_resumen(a), encoding="utf-8")
+    return ruta
+
+
+def imagen_resultado(a: Analisis) -> np.ndarray:
+    """Foto con cada fruto separado (contorno de color), su número, su madurez y su medida."""
+    img = a.resultado.imagen
+    if a.tabla.empty:
+        return img.copy()
+    salida = vis.dibujar_detecciones(img, a.resultado.detecciones, a.tabla, a.perfil.madurez)
+    capa = salida.copy()
+    colores = [(0, 255, 0), (255, 160, 0), (0, 200, 255), (255, 0, 255), (0, 255, 255), (255, 255, 0)]
+    for i, d in enumerate(a.resultado.detecciones):
+        cv2.drawContours(capa, [d.contorno], -1, colores[i % len(colores)], 3)
+    salida = cv2.addWeighted(capa, 0.9, salida, 0.1, 0)
+    if "diametro_equiv_mm" in a.tabla and a.tabla["diametro_equiv_mm"].notna().any():
+        salida = vis.dibujar_diametros(salida, a.resultado.detecciones, a.tabla)
+    return salida
+
+
+def guardar_imagen_resultado(a: Analisis) -> Path:
+    ruta = cfg.DIR_RES_DETECCIONES / f"{a.ruta.stem}_resultado.png"
+    proc.guardar_imagen(ruta, imagen_resultado(a))
     return ruta

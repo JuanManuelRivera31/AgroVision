@@ -1,0 +1,20 @@
+================================================================
+  AGROVISION - RESULTADO   (foto_20261112_083619.png)
+================================================================
+Fruta           : TOMATE (reconocida sola)
+Parecido        : tomate 100%
+Frutos contados : 5
+Madurez         : Verde 0   Pintón 1   Maduro 4
+Diámetro medio  : 5.7 cm   (mínimo 5.0, máximo 6.1)
+Lente a         : 27.45 cm de la superficie (tamaños aproximados)
+
+ #  Madurez     Largo x ancho (cm)  Diám. (cm)  Tamaño
+------------------------------------------------------
+ 1  Maduro         5.7 x 5.3        5.6       Mediano
+ 2  Maduro         5.6 x 5.5        5.7       Mediano
+ 3  Maduro         5.0 x 4.9        5.0       Pequeño
+ 4  Maduro         6.2 x 5.6        6.1       Mediano
+ 5  Pintón         6.0 x 5.8        5.9       Mediano
+
+Tiempo de análisis: 10.2 s
+================================================================

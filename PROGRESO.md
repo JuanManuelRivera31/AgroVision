@@ -740,3 +740,12 @@ queda en conteo y clasificación, sin tamaño físico ni profundidad.
   parecen. El mango de internet (mangos.jpg) quedó 50/50 con manzana (foto apretada de internet).
 - **Resumen en la terminal:** `agrovision/resumen.py`; `tomar_foto.py` lo imprime al guardar y lo
   guarda en `resultados/estadisticas/<foto>_resumen.txt`.
+
+## 2026-11-12 — separación, cm y velocidad
+
+- `_absorber_fragmentos` (segmentacion.py): los trozos pequeños rechazados que tocan un fruto
+  vuelven a él si la unión sigue siendo un fruto; arregla el tomate amarillo cortado (5.9 -> 7.0 cm).
+- Mango: sin follaje verde y con envolvente convexa: ya no pierde la parte verde (8.4 -> mide el
+  fruto entero).
+- `tomar_foto.py` ejecuta el notebook en OTRO proceso mientras calcula y muestra la ventana del
+  resultado: al cerrar la ventana el notebook ya está listo (~14 s en total).

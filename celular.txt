@@ -1,0 +1,7 @@
+# IP del celular con DroidCam (la que muestra la app en pantalla).
+# Escriba SOLO la IP en una línea (sin http://), por ejemplo:
+#   192.168.1.5
+# Si la app muestra IP y puerto, también sirve:  192.168.1.5:4747
+# Un número (0, 1, 2...) usa DroidCam Client / cámara del PC con ese índice.
+# Las líneas que empiezan con # se ignoran.
+172.27.29.21

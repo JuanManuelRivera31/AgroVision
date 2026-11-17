@@ -154,7 +154,7 @@ def nuevo_clasificador():
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import SVC
-    return make_pipeline(StandardScaler(), SVC(C=3, class_weight="balanced"))
+    return make_pipeline(StandardScaler(), SVC(C=10, class_weight="balanced"))
 
 
 def entrenar(guardar: bool = True):

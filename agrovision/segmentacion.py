@@ -305,6 +305,10 @@ def segmentar(img_bgr: np.ndarray, p: ParametrosSegmentacion) -> ResultadoSegmen
                        for t, a in zip(aceptadas, areas) if a < corte]
         aceptadas = [t for t, a in zip(aceptadas, areas) if a >= corte]
 
+    # 8b) Trozos pequeños pegados a un fruto (zonas pálidas, manchas, brillos que el
+    # color no cubrió) vuelven al fruto: así no se subestima su tamaño.
+    aceptadas = _absorber_fragmentos(aceptadas, rechazadas, distintiva, p, img.shape)
+
     # Identificadores únicos en orden de lectura (filas de arriba a abajo).
     fila = max(1, alto // 12)
     aceptadas.sort(key=lambda t: (t[1][1] // fila, t[1][0]))
@@ -312,6 +316,48 @@ def segmentar(img_bgr: np.ndarray, p: ParametrosSegmentacion) -> ResultadoSegmen
                    for i, (c, b, mk, fc, ws) in enumerate(aceptadas)]
 
     return ResultadoSegmentacion(img, escala, etapas, detecciones, rechazadas)
+
+
+def _absorber_fragmentos(aceptadas: list, rechazadas: list, distintiva: np.ndarray,
+                         p: ParametrosSegmentacion, forma: tuple) -> list:
+    """Une a cada fruto los trozos rechazados por pequeños que lo tocan.
+
+    Se acepta la unión solo si sigue pareciendo UN fruto (solidez y aspecto del
+    perfil) y no lo agranda más de 1.5 veces; si no, el trozo sigue rechazado.
+    """
+    if not aceptadas:
+        return aceptadas
+    aceptadas = list(aceptadas)
+    pequenos = [r for r in rechazadas if r.motivo.startswith(("pequeña", "área pequeña"))]
+    k = kernel_eliptico(9)
+    for r in pequenos:
+        trozo = np.zeros(forma[:2], np.uint8)
+        cv2.drawContours(trozo, [r.contorno], -1, 255, cv2.FILLED)
+        trozo_d = cv2.dilate(trozo, k)
+        mejor = None
+        for j, (cr, _, _, _, dividida) in enumerate(aceptadas):
+            fruto = np.zeros(forma[:2], np.uint8)
+            cv2.drawContours(fruto, [cr], -1, 255, cv2.FILLED)
+            toque = cv2.countNonZero(cv2.bitwise_and(trozo_d, fruto))
+            if toque and (mejor is None or toque > mejor[0]):
+                mejor = (toque, j, fruto, dividida)
+        if mejor is None:
+            continue
+        _, j, fruto, dividida = mejor
+        union = cv2.morphologyEx(cv2.bitwise_or(fruto, trozo), cv2.MORPH_CLOSE, k)
+        cs, _ = cv2.findContours(union, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        if not cs:
+            continue
+        nuevo = max(cs, key=cv2.contourArea)
+        if p.usar_envolvente:
+            nuevo = cv2.convexHull(nuevo)
+        m = metricas_contorno(nuevo)
+        if m["solidez"] < p.solidez_min or m["aspecto"] > p.aspecto_max or                 m["area"] > 1.5 * cv2.countNonZero(fruto):
+            continue
+        mr, mask_r, frac = _medir_region(nuevo, distintiva)
+        aceptadas[j] = (nuevo, mr["bbox"], mask_r, frac, dividida)
+        rechazadas[:] = [x for x in rechazadas if x is not r]
+    return aceptadas
 
 
 def _medir_region(c: np.ndarray, distintiva: np.ndarray) -> tuple:
